@@ -38,9 +38,9 @@ function AppContent() {
                   type="button"
                   onClick={() => setMenuOpen(false)}
                   aria-label="Close navigation menu"
-                  className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                  className="rounded-lg p-2 text-gray-600 transition hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                 >
-                  ×
+                  <span className="text-xl leading-none">×</span>
                 </button>
               </div>
 
@@ -49,20 +49,23 @@ function AppContent() {
           </div>
         )}
 
-        <main className="min-w-0 flex-1 md:ml-64">
+        {/* Main content */}
+        <main className="min-w-0 md:ml-64">
           <Header
             darkMode={darkMode}
             setDarkMode={setDarkMode}
             onMenuClick={() => setMenuOpen(true)}
           />
 
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/tasks" element={<Tasks />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+          <div className="mx-auto w-full max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/projects" element={<Projects />} />
+              <Route path="/tasks" element={<Tasks />} />
+              <Route path="/team" element={<Team />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </div>
         </main>
       </div>
     </div>

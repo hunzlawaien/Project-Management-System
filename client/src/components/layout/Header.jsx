@@ -1,22 +1,60 @@
 import { Sun, Moon, Menu } from "lucide-react";
+import { useLocation } from "react-router-dom";
+
+const pageDetails = {
+  "/": {
+    title: "Dashboard",
+    description: "Welcome back! Here's what's happening.",
+  },
+  "/dashboard": {
+    title: "Dashboard",
+    description: "Welcome back! Here's what's happening.",
+  },
+  "/projects": {
+    title: "Projects",
+    description: "Manage your projects and track their progress.",
+  },
+  "/tasks": {
+    title: "Tasks",
+    description: "Organize your work and keep track of deadlines.",
+  },
+  "/team": {
+    title: "Team",
+    description: "Manage your team and collaborate on projects.",
+  },
+  "/settings": {
+    title: "Settings",
+    description: "Manage your preferences and account settings.",
+  },
+};
 
 function Header({ darkMode, setDarkMode, onMenuClick }) {
+  const location = useLocation();
+
+  const currentPage = pageDetails[location.pathname] || {
+    title: "TaskFlow",
+    description: "Manage your projects and tasks in one place.",
+  };
+
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-4 dark:border-gray-800 dark:bg-gray-950 sm:px-6">
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Dashboard
+    <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-4 border-b border-gray-200 bg-white px-5 py-4 dark:border-gray-800 dark:bg-gray-950 sm:px-8">
+      <div className="min-w-0">
+        <h2 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-2xl">
+          {currentPage.title}
         </h2>
-        <p className="text-xs text-gray-500">
-          Welcome back! Here's what's happening.
+
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {currentPage.description}
         </p>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-2">
         <button
-          aria-label="Toggle theme"
+          type="button"
+          aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          title={darkMode ? "Light mode" : "Dark mode"}
           onClick={() => setDarkMode(!darkMode)}
-          className="rounded-lg border border-gray-200 p-2 text-gray-600 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
@@ -25,9 +63,9 @@ function Header({ darkMode, setDarkMode, onMenuClick }) {
           type="button"
           onClick={onMenuClick}
           aria-label="Open navigation menu"
-          className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800 md:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800 md:hidden"
         >
-          <Menu size={22} />
+          <Menu size={20} />
         </button>
       </div>
     </header>
