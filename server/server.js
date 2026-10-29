@@ -5,6 +5,7 @@ require("dotenv").config();
 
 const projectRoutes = require("./routes/projectRoutes");
 const taskRoutes = require("./routes/taskRoutes");
+const teamRoutes = require("./routes/teamRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +19,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/team", teamRoutes);
 
 async function startServer() {
   try {
