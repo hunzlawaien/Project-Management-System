@@ -18,6 +18,10 @@ const pageDetails = {
     title: "Tasks",
     description: "Organize your work and keep track of deadlines.",
   },
+  "/my-tasks": {
+    title: "My Tasks",
+    description: "View and manage the tasks assigned to you.",
+  },
   "/team": {
     title: "Team",
     description: "Manage your team and collaborate on projects.",
@@ -56,16 +60,18 @@ function Header({ darkMode, setDarkMode, onMenuClick }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2">
+        {/* Theme toggle */}
         <button
           type="button"
           aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
           title={darkMode ? "Light mode" : "Dark mode"}
-          onClick={() => setDarkMode(!darkMode)}
+          onClick={() => setDarkMode((previousMode) => !previousMode)}
           className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
         </button>
 
+        {/* Logout */}
         <button
           type="button"
           onClick={handleLogout}
@@ -77,6 +83,7 @@ function Header({ darkMode, setDarkMode, onMenuClick }) {
           <span className="hidden sm:inline">Logout</span>
         </button>
 
+        {/* Mobile menu */}
         <button
           type="button"
           onClick={onMenuClick}

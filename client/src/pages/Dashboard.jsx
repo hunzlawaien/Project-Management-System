@@ -20,23 +20,24 @@ function Dashboard() {
   const [projects, setProjects] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+
   const [loading, setLoading] = useState(true);
+  const [teamLoading, setTeamLoading] = useState(true);
   const [error, setError] = useState("");
+  const [teamError, setTeamError] = useState("");
 
   async function loadDashboardData() {
     try {
       setLoading(true);
       setError("");
 
-      const [projectData, taskData, teamData] = await Promise.all([
+      const [projectData, taskData] = await Promise.all([
         getProjects(),
         getTasks(),
-        getTeamMembers(),
       ]);
 
       setProjects(Array.isArray(projectData) ? projectData : []);
       setTasks(Array.isArray(taskData) ? taskData : []);
-      setTeamMembers(Array.isArray(teamData) ? teamData : []);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -47,8 +48,30 @@ function Dashboard() {
     }
   }
 
+  async function loadTeamData() {
+    try {
+      setTeamLoading(true);
+      setTeamError("");
+
+      const teamData = await getTeamMembers();
+
+      setTeamMembers(Array.isArray(teamData.members) ? teamData.members : []);
+    } catch (err) {
+      setTeamMembers([]);
+      setTeamError(
+        err.response?.data?.message || "Could not load team members.",
+      );
+    } finally {
+      setTeamLoading(false);
+    }
+  }
+
+  async function refreshDashboard() {
+    await Promise.all([loadDashboardData(), loadTeamData()]);
+  }
+
   useEffect(() => {
-    loadDashboardData();
+    refreshDashboard();
   }, []);
 
   const totalProjects = projects.length;
@@ -244,7 +267,15 @@ function Dashboard() {
           <StatCard
             key={stat.title}
             {...stat}
-            value={loading ? "—" : stat.value}
+            value={
+              stat.title === "Team Members"
+                ? teamLoading
+                  ? "—"
+                  : stat.value
+                : loading
+                  ? "—"
+                  : stat.value
+            }
           />
         ))}
       </section>
@@ -518,15 +549,24 @@ function Dashboard() {
           </Link>
         </div>
 
-        {loading ? (
+        {teamLoading ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500 dark:text-gray-400">
             <RefreshCw size={18} className="animate-spin" />
             Loading team members...
           </div>
-        ) : error ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Team information is unavailable.
-          </p>
+        ) : teamError ? (
+          <div className="py-8 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {teamError}
+            </p>
+            <button
+              type="button"
+              onClick={loadTeamData}
+              className="mt-3 text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            >
+              Try again
+            </button>
+          </div>
         ) : recentTeamMembers.length === 0 ? (
           <div className="py-8 text-center">
             <Users size={32} className="mx-auto mb-3 text-gray-400" />
@@ -540,7 +580,7 @@ function Dashboard() {
               to="/team"
               className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
             >
-              Add Team Member
+              View Team
             </Link>
           </div>
         ) : (
@@ -555,9 +595,8 @@ function Dashboard() {
                   <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
                     {member.name}
                   </p>
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    {member.role}
-                    {member.department ? ` · ${member.department}` : ""}
+                  <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
+                    {member.email}
                   </p>
                 </div>
 

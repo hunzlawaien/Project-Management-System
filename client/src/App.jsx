@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import Sidebar from "./components/layout/Sidebar";
@@ -15,8 +15,16 @@ import Register from "./pages/Register";
 import MyTasks from "./pages/MyTasks";
 
 function AppContent() {
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("darkMode") === "true";
+  });
+
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Save the selected theme whenever it changes.
+  useEffect(() => {
+    localStorage.setItem("darkMode", darkMode);
+  }, [darkMode]);
 
   return (
     <Routes>
@@ -76,7 +84,15 @@ function AppContent() {
                       <Route path="/tasks" element={<Tasks />} />
                       <Route path="/my-tasks" element={<MyTasks />} />
                       <Route path="/team" element={<Team />} />
-                      <Route path="/settings" element={<Settings />} />
+                      <Route
+                        path="/settings"
+                        element={
+                          <Settings
+                            darkMode={darkMode}
+                            setDarkMode={setDarkMode}
+                          />
+                        }
+                      />
                       <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                   </div>

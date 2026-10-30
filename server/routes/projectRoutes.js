@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
     const projects = await Project.find({
       members: req.user.userId,
     })
-      .populate("members", "name")
+      .populate("members", "name email")
       .sort({ createdAt: -1 });
 
     res.json(projects);
@@ -74,7 +74,7 @@ router.post("/", async (req, res) => {
       members: [req.user.userId],
     });
 
-    await project.populate("members", "name");
+    await project.populate("members", "name email");
 
     res.status(201).json(project);
   } catch (error) {
@@ -123,6 +123,12 @@ router.post("/:id/members", async (req, res) => {
       });
     }
 
+    if (user._id.toString() === project.owner.toString()) {
+      return res.status(400).json({
+        message: "The project owner is already a member",
+      });
+    }
+
     const alreadyMember = project.members.some(
       (memberId) => memberId.toString() === user._id.toString(),
     );
@@ -134,8 +140,9 @@ router.post("/:id/members", async (req, res) => {
     }
 
     project.members.push(user._id);
+
     await project.save();
-    await project.populate("members", "name");
+    await project.populate("members", "name email");
 
     res.status(200).json({
       message: "Collaborator added successfully",
@@ -143,6 +150,65 @@ router.post("/:id/members", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: "Failed to add collaborator" });
+  }
+});
+
+// Remove a member from a project
+router.delete("/:id/members/:memberId", async (req, res) => {
+  try {
+    const { id, memberId } = req.params;
+
+    if (!isValidId(id) || !isValidId(memberId)) {
+      return res.status(400).json({
+        message: "Invalid project or member ID",
+      });
+    }
+
+    const project = await Project.findById(id);
+
+    if (!project) {
+      return res.status(404).json({
+        message: "Project not found",
+      });
+    }
+
+    if (project.owner.toString() !== req.user.userId) {
+      return res.status(403).json({
+        message: "Only the project owner can remove members",
+      });
+    }
+
+    if (memberId === project.owner.toString()) {
+      return res.status(400).json({
+        message: "The project owner cannot be removed",
+      });
+    }
+
+    const isMember = project.members.some(
+      (member) => member.toString() === memberId,
+    );
+
+    if (!isMember) {
+      return res.status(404).json({
+        message: "This user is not a member of the project",
+      });
+    }
+
+    project.members = project.members.filter(
+      (member) => member.toString() !== memberId,
+    );
+
+    await project.save();
+    await project.populate("members", "name email");
+
+    res.json({
+      message: "Collaborator removed successfully",
+      project,
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Failed to remove collaborator",
+    });
   }
 });
 
@@ -156,7 +222,7 @@ router.get("/:id", async (req, res) => {
     const project = await Project.findOne({
       _id: req.params.id,
       members: req.user.userId,
-    }).populate("members", "name");
+    }).populate("members", "name email");
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
@@ -254,8 +320,9 @@ router.put("/:id", async (req, res) => {
     }
 
     Object.assign(project, updates);
+
     await project.save();
-    await project.populate("members", "name");
+    await project.populate("members", "name email");
 
     res.json(project);
   } catch (error) {

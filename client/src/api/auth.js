@@ -15,3 +15,15 @@ export async function loginUser(userData) {
   const response = await authAPI.post("/login", userData);
   return response.data;
 }
+
+export async function changePassword(passwordData) {
+  const token = localStorage.getItem("token");
+
+  const response = await authAPI.put("/change-password", passwordData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+}

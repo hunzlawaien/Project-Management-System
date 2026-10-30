@@ -6,27 +6,35 @@ const Team = require("../models/Team");
 
 const router = express.Router();
 
-async function getOrCreateTeam(userId) {
-  let team = await Team.findOne().sort({ createdAt: 1 });
-
-  if (!team) {
-    team = await Team.create({
-      name: "CoWork Team",
-      members: [userId],
-      createdBy: userId,
-    });
-  } else if (!team.members.some((memberId) => memberId.toString() === userId)) {
-    team.members.push(userId);
-    await team.save();
-  }
-
-  return team;
+// Get the shared team
+async function getTeam() {
+  return Team.findOne().sort({ createdAt: 1 });
 }
 
-// GET /api/team - Get shared team members
+// GET /api/team
+// Only existing team members can view the team
 router.get("/", async (req, res) => {
   try {
-    const team = await getOrCreateTeam(req.user.userId);
+    let team = await getTeam();
+
+    // Create the first shared team if it doesn't exist
+    if (!team) {
+      team = await Team.create({
+        name: "CoWork Team",
+        members: [req.user.userId],
+        createdBy: req.user.userId,
+      });
+    }
+
+    const isMember = team.members.some(
+      (memberId) => memberId.toString() === req.user.userId,
+    );
+
+    if (!isMember) {
+      return res.status(403).json({
+        message: "You are not a member of the shared team",
+      });
+    }
 
     const members = await User.find({
       _id: { $in: team.members },
@@ -34,13 +42,19 @@ router.get("/", async (req, res) => {
       .select("name email createdAt")
       .sort({ name: 1 });
 
-    res.status(200).json(members);
+    res.status(200).json({
+      members,
+      isCreator: team.createdBy.toString() === req.user.userId,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch team members" });
+    res.status(500).json({
+      message: "Failed to fetch team members",
+    });
   }
 });
 
-// POST /api/team - Add a registered user by email
+// POST
+// Only the team creator can add registered users
 router.post("/", async (req, res) => {
   try {
     const { email } = req.body;
@@ -51,9 +65,25 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const team = await getTeam();
+
+    if (!team) {
+      return res.status(404).json({
+        message: "Shared team not found",
+      });
+    }
+
+    if (team.createdBy.toString() !== req.user.userId) {
+      return res.status(403).json({
+        message: "Only the team creator can add members",
+      });
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
-    const userToAdd = await User.findOne({ email: normalizedEmail });
+    const userToAdd = await User.findOne({
+      email: normalizedEmail,
+    });
 
     if (!userToAdd) {
       return res.status(404).json({
@@ -61,15 +91,11 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const currentUserId = req.user.userId;
-
-    if (userToAdd._id.toString() === currentUserId) {
+    if (userToAdd._id.toString() === req.user.userId) {
       return res.status(400).json({
-        message: "You are already part of your team",
+        message: "You are already the team creator",
       });
     }
-
-    const team = await getOrCreateTeam(currentUserId);
 
     const alreadyMember = team.members.some(
       (memberId) => memberId.toString() === userToAdd._id.toString(),
@@ -93,44 +119,56 @@ router.post("/", async (req, res) => {
       members,
     });
   } catch (error) {
-    res.status(500).json({ message: "Failed to add team member" });
+    res.status(500).json({
+      message: "Failed to add team member",
+    });
   }
 });
 
-// DELETE /api/team/:userId - Remove a member
+// DELETE
+// Only the team creator can remove members
 router.delete("/:userId", async (req, res) => {
   try {
-    if (!mongoose.isValidObjectId(req.params.userId)) {
-      return res.status(400).json({ message: "Invalid user ID" });
+    const { userId } = req.params;
+
+    if (!mongoose.isValidObjectId(userId)) {
+      return res.status(400).json({
+        message: "Invalid user ID",
+      });
     }
 
-    const team = await Team.findOne();
+    const team = await getTeam();
 
-    if (
-      !team ||
-      !team.members.some(
-        (memberId) => memberId.toString() === req.params.userId,
-      )
-    ) {
-      return res.status(404).json({ message: "Team member not found" });
+    if (!team) {
+      return res.status(404).json({
+        message: "Shared team not found",
+      });
     }
 
-    const currentUserId = req.user.userId;
-
-    if (team.createdBy.toString() !== currentUserId) {
+    if (team.createdBy.toString() !== req.user.userId) {
       return res.status(403).json({
         message: "Only the team creator can remove members",
       });
     }
 
-    if (req.params.userId === currentUserId) {
+    if (userId === req.user.userId) {
       return res.status(400).json({
-        message: "Remove other members before leaving the shared team",
+        message: "The team creator cannot remove themselves",
+      });
+    }
+
+    const isMember = team.members.some(
+      (memberId) => memberId.toString() === userId,
+    );
+
+    if (!isMember) {
+      return res.status(404).json({
+        message: "Team member not found",
       });
     }
 
     team.members = team.members.filter(
-      (memberId) => memberId.toString() !== req.params.userId,
+      (memberId) => memberId.toString() !== userId,
     );
 
     await team.save();
@@ -139,7 +177,9 @@ router.delete("/:userId", async (req, res) => {
       message: "Team member removed successfully",
     });
   } catch (error) {
-    res.status(500).json({ message: "Failed to remove team member" });
+    res.status(500).json({
+      message: "Failed to remove team member",
+    });
   }
 });
 

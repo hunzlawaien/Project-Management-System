@@ -4,6 +4,8 @@ import { getTeamMembers, addTeamMember, removeTeamMember } from "../api/team";
 
 function Team() {
   const [members, setMembers] = useState([]);
+  const [isCreator, setIsCreator] = useState(false);
+  const [creatorId, setCreatorId] = useState("");
   const [search, setSearch] = useState("");
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
@@ -17,8 +19,12 @@ function Team() {
   async function loadMembers() {
     try {
       setError("");
+
       const data = await getTeamMembers();
-      setMembers(data);
+
+      setMembers(data.members);
+      setIsCreator(data.isCreator);
+      setCreatorId(data.creatorId);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -117,22 +123,26 @@ function Team() {
             <h2 className="font-semibold text-gray-900 dark:text-white">
               My Team
             </h2>
+
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               View and manage registered CoWork team members.
             </p>
+
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
               {members.length} {members.length === 1 ? "member" : "members"}
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={openAddForm}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
-          >
-            <Plus size={18} />
-            Add Team Member
-          </button>
+          {isCreator && (
+            <button
+              type="button"
+              onClick={openAddForm}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <Plus size={18} />
+              Add Team Member
+            </button>
+          )}
         </div>
 
         {error && (
@@ -158,6 +168,7 @@ function Team() {
             size={18}
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
           />
+
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -174,13 +185,17 @@ function Team() {
         ) : filteredMembers.length === 0 ? (
           <div className="py-12 text-center">
             <Users size={32} className="mx-auto mb-3 text-gray-400" />
+
             <p className="font-medium text-gray-900 dark:text-white">
               {searchText ? "No team members found" : "No team members yet"}
             </p>
+
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {searchText
                 ? "Try searching with another name or email."
-                : "Add a registered CoWork user to get started."}
+                : isCreator
+                  ? "Add a registered CoWork user to get started."
+                  : "There are no members to display."}
             </p>
           </div>
         ) : (
@@ -205,21 +220,26 @@ function Team() {
                     <h3 className="truncate font-medium text-gray-900 dark:text-white">
                       {member.name}
                     </h3>
+
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      CoWork Member
+                      {member._id === creatorId
+                        ? "Team Creator"
+                        : "CoWork Member"}
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(member)}
-                    disabled={deletingId === member._id}
-                    aria-label={`Remove ${member.name} from team`}
-                    title="Remove team member"
-                    className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/40"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {isCreator && member._id !== creatorId && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(member)}
+                      disabled={deletingId === member._id}
+                      aria-label={`Remove ${member.name} from team`}
+                      title="Remove team member"
+                      className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/40"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="mt-5 flex items-center gap-2 border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
@@ -232,7 +252,7 @@ function Team() {
         )}
       </section>
 
-      {showForm && (
+      {showForm && isCreator && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
           <div
             role="dialog"
@@ -248,6 +268,7 @@ function Team() {
                 >
                   Add Team Member
                 </h2>
+
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                   Enter the email address of a registered CoWork user.
                 </p>
@@ -271,6 +292,7 @@ function Team() {
                 >
                   Registered User Email
                 </label>
+
                 <input
                   id="team-member-email"
                   type="email"

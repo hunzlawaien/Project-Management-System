@@ -8,6 +8,7 @@ const taskRoutes = require("./routes/taskRoutes");
 const teamRoutes = require("./routes/teamRoutes");
 const authRoutes = require("./routes/authRoutes");
 const protect = require("./middleware/authMiddleware");
+const profileRoutes = require("./routes/profileRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -24,6 +25,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/projects", protect, projectRoutes);
 app.use("/api/tasks", protect, taskRoutes);
 app.use("/api/team", protect, teamRoutes);
+app.use("/api/profile", protect, profileRoutes);
 
 async function startServer() {
   try {

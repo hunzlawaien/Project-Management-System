@@ -27,3 +27,11 @@ export async function addProjectMember(projectId, email) {
 
   return response.data;
 }
+
+export async function removeProjectMember(projectId, memberId) {
+  const response = await api.delete(
+    `/api/projects/${projectId}/members/${memberId}`,
+  );
+
+  return response.data;
+}

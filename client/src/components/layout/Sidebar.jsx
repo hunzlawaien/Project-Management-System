@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -18,16 +19,29 @@ const navItems = [
   { label: "Settings", icon: Settings, path: "/settings" },
 ];
 
+function getStoredUser() {
+  try {
+    return JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function Sidebar() {
   const navigate = useNavigate();
+  const [user, setUser] = useState(getStoredUser);
 
-  let user = {};
+  useEffect(() => {
+    const handleProfileUpdate = () => {
+      setUser(getStoredUser());
+    };
 
-  try {
-    user = JSON.parse(localStorage.getItem("user") || "{}");
-  } catch {
-    user = {};
-  }
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+
+    return () => {
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+    };
+  }, []);
 
   const userName = user.name || "User";
   const userInitial = userName.charAt(0).toUpperCase();
@@ -78,8 +92,16 @@ function Sidebar() {
       {/* Logged-in user profile */}
       <div className="border-t border-gray-200 p-4 dark:border-gray-800">
         <div className="flex items-center gap-3 rounded-lg p-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-            {userInitial}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+            {user.profilePicture ? (
+              <img
+                src={user.profilePicture}
+                alt="Profile"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              userInitial
+            )}
           </div>
 
           <div className="min-w-0 flex-1">
