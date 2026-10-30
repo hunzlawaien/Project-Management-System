@@ -18,6 +18,7 @@ const initialForm = {
   title: "",
   description: "",
   project: "",
+  assignee: "",
   status: "To Do",
   priority: "Medium",
   dueDate: "",
@@ -29,6 +30,7 @@ const priorityOptions = ["Low", "Medium", "High"];
 function Tasks() {
   const [tasks, setTasks] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -39,6 +41,15 @@ function Tasks() {
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [form, setForm] = useState(initialForm);
+
+  useEffect(() => {
+    try {
+      const savedUser = JSON.parse(localStorage.getItem("user") || "null");
+      setCurrentUser(savedUser);
+    } catch {
+      setCurrentUser(null);
+    }
+  }, []);
 
   async function loadData() {
     try {
@@ -66,6 +77,34 @@ function Tasks() {
     loadData();
   }, []);
 
+  function isProjectOwner(projectId) {
+    const id = projectId?._id || projectId;
+
+    const project = projects.find((item) => String(item._id) === String(id));
+
+    if (!project || !currentUser) return false;
+
+    const ownerId = project.owner?._id || project.owner || "";
+    const userId = currentUser._id || currentUser.id || "";
+
+    return String(ownerId) === String(userId);
+  }
+
+  function canEditTask(task) {
+    if (isProjectOwner(task.project)) return true;
+
+    const creatorId = task.createdBy?._id || task.createdBy;
+    const userId = currentUser?._id || currentUser?.id;
+
+    return Boolean(creatorId && userId && String(creatorId) === String(userId));
+  }
+
+  const selectedProject = projects.find(
+    (project) => String(project._id) === String(form.project),
+  );
+
+  const projectMembers = selectedProject?.members || [];
+
   function openCreateForm() {
     setEditingTask(null);
     setForm({
@@ -78,14 +117,17 @@ function Tasks() {
 
   function openEditForm(task) {
     setEditingTask(task);
+
     setForm({
       title: task.title || "",
       description: task.description || "",
       project: task.project?._id || task.project || "",
+      assignee: task.assignee?._id || task.assignee || "",
       status: task.status || "To Do",
       priority: task.priority || "Medium",
       dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
     });
+
     setFormError("");
     setShowForm(true);
   }
@@ -99,7 +141,21 @@ function Tasks() {
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
+
+    setForm((current) => {
+      if (name === "project") {
+        return {
+          ...current,
+          project: value,
+          assignee: "",
+        };
+      }
+
+      return {
+        ...current,
+        [name]: value,
+      };
+    });
   }
 
   async function handleSubmit(event) {
@@ -119,17 +175,25 @@ function Tasks() {
     try {
       setSaving(true);
 
-      const taskData = {
-        ...form,
-        title: form.title.trim(),
-        description: form.description.trim(),
-        dueDate: form.dueDate || null,
-      };
-
-      if (editingTask) {
-        await updateTask(editingTask._id, taskData);
+      if (editingTask && !canEditTask(editingTask)) {
+        // Collaborators who did not create the task can update its status only.
+        await updateTask(editingTask._id, {
+          status: form.status,
+        });
       } else {
-        await createTask(taskData);
+        const taskData = {
+          ...form,
+          title: form.title.trim(),
+          description: form.description.trim(),
+          assignee: form.assignee || null,
+          dueDate: form.dueDate || null,
+        };
+
+        if (editingTask) {
+          await updateTask(editingTask._id, taskData);
+        } else {
+          await createTask(taskData);
+        }
       }
 
       closeForm();
@@ -174,10 +238,13 @@ function Tasks() {
   }
 
   const filteredTasks = tasks.filter((task) => {
+    const searchText = search.toLowerCase();
+
     const matchesSearch =
-      task.title.toLowerCase().includes(search.toLowerCase()) ||
-      (task.description || "").toLowerCase().includes(search.toLowerCase()) ||
-      (task.project?.name || "").toLowerCase().includes(search.toLowerCase());
+      task.title.toLowerCase().includes(searchText) ||
+      (task.description || "").toLowerCase().includes(searchText) ||
+      (task.project?.name || "").toLowerCase().includes(searchText) ||
+      (task.assignee?.name || "").toLowerCase().includes(searchText);
 
     const matchesStatus =
       statusFilter === "All" || task.status === statusFilter;
@@ -304,7 +371,7 @@ function Tasks() {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search tasks or projects..."
+            placeholder="Search tasks, projects, or assignees..."
             className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-gray-800 dark:bg-gray-950 dark:text-white dark:focus:ring-emerald-900/40"
           />
         </div>
@@ -356,12 +423,13 @@ function Tasks() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left">
+            <table className="w-full min-w-[900px] text-left">
               <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900">
                 <tr>
                   {[
                     "Task",
                     "Project",
+                    "Assignee",
                     "Status",
                     "Priority",
                     "Due Date",
@@ -378,80 +446,100 @@ function Tasks() {
               </thead>
 
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filteredTasks.map((task) => (
-                  <tr
-                    key={task._id}
-                    className="transition hover:bg-gray-50 dark:hover:bg-gray-900/60"
-                  >
-                    <td className="px-4 py-4">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {task.title}
-                      </p>
-                      {task.description && (
-                        <p className="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">
-                          {task.description}
+                {filteredTasks.map((task) => {
+                  const canManageTask = isProjectOwner(task.project);
+                  const canEdit = canEditTask(task);
+
+                  return (
+                    <tr
+                      key={task._id}
+                      className="transition hover:bg-gray-50 dark:hover:bg-gray-900/60"
+                    >
+                      <td className="px-4 py-4">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {task.title}
                         </p>
-                      )}
-                    </td>
+                        {task.description && (
+                          <p className="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">
+                            {task.description}
+                          </p>
+                        )}
+                      </td>
 
-                    <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
-                      {task.project?.name || "Unknown project"}
-                    </td>
+                      <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {task.project?.name || "Unknown project"}
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <select
-                        aria-label={`Status for ${task.title}`}
-                        value={task.status}
-                        onChange={(event) =>
-                          handleStatusChange(task, event.target.value)
-                        }
-                        className={`rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none ${statusStyle(task.status)}`}
-                      >
-                        {statusOptions.map((status) => (
-                          <option key={status} value={status}>
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                      <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {task.assignee?.name || "Unassigned"}
+                      </td>
 
-                    <td className="px-4 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${priorityStyle(task.priority)}`}
-                      >
-                        {task.priority}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                        <CalendarDays size={15} />
-                        {formatDate(task.dueDate)}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label={`Edit ${task.title}`}
-                          onClick={() => openEditForm(task)}
-                          className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-emerald-700 dark:hover:bg-gray-800 dark:hover:text-emerald-400"
+                      <td className="px-4 py-4">
+                        <select
+                          aria-label={`Status for ${task.title}`}
+                          value={task.status}
+                          onChange={(event) =>
+                            handleStatusChange(task, event.target.value)
+                          }
+                          className={`rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none ${statusStyle(task.status)}`}
                         >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Delete ${task.title}`}
-                          onClick={() => handleDelete(task)}
-                          className="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                          {statusOptions.map((status) => (
+                            <option key={status} value={status}>
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${priorityStyle(task.priority)}`}
                         >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {task.priority}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                          <CalendarDays size={15} />
+                          {formatDate(task.dueDate)}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+                          {canEdit && (
+                            <button
+                              type="button"
+                              aria-label={`Edit ${task.title}`}
+                              onClick={() => openEditForm(task)}
+                              className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-emerald-700 dark:hover:bg-gray-800 dark:hover:text-emerald-400"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                          )}
+
+                          {canManageTask && (
+                            <button
+                              type="button"
+                              aria-label={`Delete ${task.title}`}
+                              onClick={() => handleDelete(task)}
+                              className="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+
+                          {!canEdit && (
+                            <span className="text-xs text-gray-400">
+                              Status only
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -462,9 +550,7 @@ function Tasks() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !saving) {
-              closeForm();
-            }
+            if (event.target === event.currentTarget && !saving) closeForm();
           }}
         >
           <div
@@ -492,132 +578,197 @@ function Tasks() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="title"
-                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Task title *
-                </label>
-                <input
-                  id="title"
-                  name="title"
-                  value={form.title}
-                  onChange={handleChange}
-                  maxLength={100}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-emerald-900/40"
-                  placeholder="e.g. Design login page"
-                />
-              </div>
+              {editingTask && !canEditTask(editingTask) ? (
+                <>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      {form.title}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      You can update this task's status only.
+                    </p>
+                  </div>
 
-              <div>
-                <label
-                  htmlFor="description"
-                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Description
-                </label>
-                <textarea
-                  id="description"
-                  name="description"
-                  value={form.description}
-                  onChange={handleChange}
-                  maxLength={1000}
-                  rows={3}
-                  className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:focus:ring-emerald-900/40"
-                  placeholder="Add task details..."
-                />
-              </div>
+                  <div>
+                    <label
+                      htmlFor="status"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Status
+                    </label>
+                    <select
+                      id="status"
+                      name="status"
+                      value={form.status}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                    >
+                      {statusOptions.map((status) => (
+                        <option key={status} value={status}>
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label
+                      htmlFor="title"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Task title *
+                    </label>
+                    <input
+                      id="title"
+                      name="title"
+                      value={form.title}
+                      onChange={handleChange}
+                      maxLength={100}
+                      required
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                      placeholder="e.g. Design login page"
+                    />
+                  </div>
 
-              <div>
-                <label
-                  htmlFor="project"
-                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Project *
-                </label>
-                <select
-                  id="project"
-                  name="project"
-                  value={form.project}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                >
-                  <option value="" disabled>
-                    Select a project
-                  </option>
-                  {projects.map((project) => (
-                    <option key={project._id} value={project._id}>
-                      {project.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  <div>
+                    <label
+                      htmlFor="description"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Description
+                    </label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={form.description}
+                      onChange={handleChange}
+                      maxLength={1000}
+                      rows={3}
+                      className="w-full resize-y rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                      placeholder="Add task details..."
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="status"
-                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Status
-                  </label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={form.status}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                  >
-                    {statusOptions.map((status) => (
-                      <option key={status} value={status}>
-                        {status}
+                  <div>
+                    <label
+                      htmlFor="project"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Project *
+                    </label>
+                    <select
+                      id="project"
+                      name="project"
+                      value={form.project}
+                      onChange={handleChange}
+                      required
+                      disabled={Boolean(editingTask)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                    >
+                      <option value="" disabled>
+                        Select a project
                       </option>
-                    ))}
-                  </select>
-                </div>
+                      {projects.map((project) => (
+                        <option key={project._id} value={project._id}>
+                          {project.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <div>
-                  <label
-                    htmlFor="priority"
-                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Priority
-                  </label>
-                  <select
-                    id="priority"
-                    name="priority"
-                    value={form.priority}
-                    onChange={handleChange}
-                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                  >
-                    {priorityOptions.map((priority) => (
-                      <option key={priority} value={priority}>
-                        {priority}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                  <div>
+                    <label
+                      htmlFor="assignee"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Assign to
+                    </label>
+                    <select
+                      id="assignee"
+                      name="assignee"
+                      value={form.assignee}
+                      onChange={handleChange}
+                      disabled={!form.project || projectMembers.length === 0}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                    >
+                      <option value="">Unassigned</option>
+                      {projectMembers.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Only members of the selected project can be assigned.
+                    </p>
+                  </div>
 
-              <div>
-                <label
-                  htmlFor="dueDate"
-                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Due date
-                </label>
-                <input
-                  id="dueDate"
-                  type="date"
-                  name="dueDate"
-                  value={form.dueDate}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
-                />
-              </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor="status"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >
+                        Status
+                      </label>
+                      <select
+                        id="status"
+                        name="status"
+                        value={form.status}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                      >
+                        {statusOptions.map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label
+                        htmlFor="priority"
+                        className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >
+                        Priority
+                      </label>
+                      <select
+                        id="priority"
+                        name="priority"
+                        value={form.priority}
+                        onChange={handleChange}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                      >
+                        {priorityOptions.map((priority) => (
+                          <option key={priority} value={priority}>
+                            {priority}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="dueDate"
+                      className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      Due date
+                    </label>
+                    <input
+                      id="dueDate"
+                      type="date"
+                      name="dueDate"
+                      value={form.dueDate}
+                      onChange={handleChange}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"
+                    />
+                  </div>
+                </>
+              )}
 
               {formError && (
                 <p
@@ -639,7 +790,7 @@ function Tasks() {
                 </button>
                 <button
                   type="submit"
-                  disabled={saving || projects.length === 0}
+                  disabled={saving || (!editingTask && projects.length === 0)}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
                   {saving && (

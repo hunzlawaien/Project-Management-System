@@ -2,13 +2,11 @@ import { useEffect, useState } from "react";
 import {
   Plus,
   Search,
-  FolderKanban,
+  Pencil,
+  Trash2,
   CalendarDays,
   Users,
-  Pencil,
-  X,
-  LoaderCircle,
-  Trash2,
+  RefreshCw,
 } from "lucide-react";
 import {
   getProjects,
@@ -17,213 +15,122 @@ import {
   deleteProject,
 } from "../api/projects";
 
-const initialFormData = {
+const emptyForm = {
   name: "",
   description: "",
   status: "Planning",
-  deadline: "",
-  members: 1,
   progress: 0,
+  deadline: "",
 };
 
-function formatDeadline(deadline) {
-  if (!deadline) return "No deadline";
-
-  const dateString = deadline.slice(0, 10);
-  const date = new Date(`${dateString}T00:00:00`);
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
+function formatDate(value) {
+  if (!value) return "No deadline";
+  return new Date(value).toLocaleDateString(undefined, {
     day: "numeric",
+    month: "short",
     year: "numeric",
   });
 }
 
-function getStatusStyle(status) {
-  if (status === "Completed") {
-    return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
-  }
+function getMemberNames(members) {
+  if (!Array.isArray(members)) return [];
 
-  if (status === "In Progress") {
-    return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
-  }
-
-  return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+  return members.map((member) => {
+    if (typeof member === "string") return member;
+    return member?.name || "Unknown member";
+  });
 }
 
 function Projects() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [pageError, setPageError] = useState("");
-  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
-  const [formData, setFormData] = useState(initialFormData);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
+  const [formData, setFormData] = useState(emptyForm);
 
   async function loadProjects() {
     try {
-      setLoading(true);
-      setPageError("");
-
+      setError("");
       const data = await getProjects();
       setProjects(data);
-    } catch (error) {
-      setPageError(
-        error.response?.data?.message ||
-          "Could not load projects. Please check your server.",
-      );
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not load projects.");
     } finally {
       setLoading(false);
     }
   }
 
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
   function openCreateForm() {
     setEditingProject(null);
-    setFormData({ ...initialFormData });
-    setFormError("");
+    setFormData(emptyForm);
+    setError("");
     setShowForm(true);
   }
 
-  function handleEdit(project) {
+  function openEditForm(project) {
     setEditingProject(project);
-
     setFormData({
-      name: project.name,
-      description: project.description,
-      status: project.status,
-      deadline: project.deadline ? project.deadline.slice(0, 10) : "",
-      members: project.members,
+      name: project.name || "",
+      description: project.description || "",
+      status: project.status || "Planning",
       progress: project.progress ?? 0,
+      deadline: project.deadline
+        ? new Date(project.deadline).toISOString().slice(0, 10)
+        : "",
     });
-
-    setFormError("");
+    setError("");
     setShowForm(true);
   }
 
-  function handleStatusChange(status) {
-    setFormData((currentData) => ({
-      ...currentData,
-      status,
-      progress:
-        status === "Completed"
-          ? 100
-          : status === "Planning"
-            ? 0
-            : currentData.status === "Completed"
-              ? 99
-              : currentData.status === "Planning"
-                ? 25
-                : currentData.progress,
-    }));
+  function closeForm() {
+    setShowForm(false);
+    setEditingProject(null);
+    setFormData(emptyForm);
   }
 
-  function handleFormChange(event) {
+  function handleChange(event) {
     const { name, value } = event.target;
-
-    setFormData((currentData) => ({
-      ...currentData,
-      [name]: value,
+    setFormData((previous) => ({
+      ...previous,
+      [name]: name === "progress" ? Number(value) : value,
     }));
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setFormError("");
-
-    const name = formData.name.trim();
-    const description = formData.description.trim();
-    const members = Number(formData.members);
-
-    if (!name || !description || !formData.deadline) {
-      setFormError("Please fill in all required fields.");
-      return;
-    }
-
-    if (name.length > 100) {
-      setFormError("Project name cannot exceed 100 characters.");
-      return;
-    }
-
-    if (description.length > 500) {
-      setFormError("Description cannot exceed 500 characters.");
-      return;
-    }
-
-    if (!Number.isInteger(members) || members < 1 || members > 100) {
-      setFormError("Team members must be a whole number from 1 to 100.");
-      return;
-    }
-
-    const selectedDeadline = new Date(`${formData.deadline}T00:00:00`);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (Number.isNaN(selectedDeadline.getTime()) || selectedDeadline < today) {
-      setFormError("Please select today or a future deadline.");
-      return;
-    }
-
-    const progress =
-      formData.status === "Completed"
-        ? 100
-        : formData.status === "Planning"
-          ? 0
-          : Number(formData.progress);
-
-    if (
-      formData.status === "In Progress" &&
-      (!Number.isInteger(progress) || progress < 1 || progress > 99)
-    ) {
-      setFormError("Progress must be a whole number from 1 to 99.");
-      return;
-    }
-
-    const projectData = {
-      name,
-      description,
-      status: formData.status,
-      deadline: formData.deadline,
-      members,
-      progress,
-    };
 
     try {
       setSaving(true);
+      setError("");
+
+      const payload = {
+        ...formData,
+        progress:
+          formData.status === "Completed"
+            ? 100
+            : formData.status === "Planning"
+              ? 0
+              : Number(formData.progress),
+      };
 
       if (editingProject) {
-        const updatedProject = await updateProject(
-          editingProject._id,
-          projectData,
-        );
-
-        setProjects((currentProjects) =>
-          currentProjects.map((project) =>
-            project._id === updatedProject._id ? updatedProject : project,
-          ),
-        );
+        await updateProject(editingProject._id, payload);
       } else {
-        const newProject = await createProject(projectData);
-
-        setProjects((currentProjects) => [newProject, ...currentProjects]);
+        await createProject(payload);
       }
 
-      setShowForm(false);
-      setEditingProject(null);
-      setFormData({ ...initialFormData });
-      setFormError("");
-    } catch (error) {
-      setFormError(
-        error.response?.data?.message ||
-          "Could not save the project. Please try again.",
-      );
+      closeForm();
+      await loadProjects();
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not save the project.");
     } finally {
       setSaving(false);
     }
@@ -237,28 +144,20 @@ function Projects() {
     if (!confirmed) return;
 
     try {
-      setDeletingId(project._id);
-      setPageError("");
-
+      setError("");
       await deleteProject(project._id);
-
-      setProjects((currentProjects) =>
-        currentProjects.filter((item) => item._id !== project._id),
+      setProjects((previous) =>
+        previous.filter((item) => item._id !== project._id),
       );
-    } catch (error) {
-      setPageError(
-        error.response?.data?.message ||
-          "Could not delete the project. Please try again.",
-      );
-    } finally {
-      setDeletingId(null);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not delete the project.");
     }
   }
 
   const filteredProjects = projects.filter((project) => {
     const matchesSearch =
-      project.name.toLowerCase().includes(search.toLowerCase()) ||
-      project.description.toLowerCase().includes(search.toLowerCase());
+      project.name?.toLowerCase().includes(search.toLowerCase()) ||
+      project.description?.toLowerCase().includes(search.toLowerCase());
 
     const matchesStatus =
       statusFilter === "All" || project.status === statusFilter;
@@ -266,18 +165,44 @@ function Projects() {
     return matchesSearch && matchesStatus;
   });
 
+  const statusClasses = {
+    Planning: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    "In Progress":
+      "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+    Completed:
+      "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="mb-6 flex justify-end">
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Projects
+          </h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Projects you own or collaborate on.
+          </p>
+        </div>
+
         <button
           type="button"
           onClick={openCreateForm}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
         >
           <Plus size={18} />
           New Project
         </button>
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+        >
+          {error}
+        </div>
+      )}
 
       <div className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
@@ -286,130 +211,103 @@ function Projects() {
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
           />
           <input
-            type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search projects..."
-            className="h-11 w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+            aria-label="Search projects"
+            className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
           />
         </div>
 
         <select
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
-          className="h-11 rounded-lg border border-gray-200 bg-white px-4 text-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+          aria-label="Filter by project status"
+          className="rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
         >
-          <option value="All">All statuses</option>
-          <option value="Planning">Planning</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Completed">Completed</option>
+          <option>All</option>
+          <option>Planning</option>
+          <option>In Progress</option>
+          <option>Completed</option>
         </select>
+
+        <button
+          type="button"
+          onClick={loadProjects}
+          title="Refresh projects"
+          aria-label="Refresh projects"
+          className="inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2.5 text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+        >
+          <RefreshCw size={18} />
+        </button>
       </div>
 
-      {pageError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-        >
-          <span>{pageError}</span>
-          <button
-            type="button"
-            onClick={loadProjects}
-            className="shrink-0 font-medium underline"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
       {loading ? (
-        <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <LoaderCircle size={20} className="animate-spin" />
+        <p className="py-12 text-center text-sm text-gray-500">
           Loading projects...
-        </div>
+        </p>
       ) : filteredProjects.length === 0 ? (
-        <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white px-6 text-center dark:border-gray-700 dark:bg-gray-900">
-          <FolderKanban size={36} className="mb-3 text-gray-400" />
-          <h2 className="font-semibold text-gray-900 dark:text-white">
+        <div className="rounded-xl border border-dashed border-gray-300 px-6 py-12 text-center dark:border-gray-700">
+          <p className="font-medium text-gray-900 dark:text-white">
             {search || statusFilter !== "All"
               ? "No matching projects"
               : "No projects yet"}
-          </h2>
-          <p className="mt-1 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-            {search || statusFilter !== "All"
-              ? "Try changing your search or status filter."
-              : "Create your first project to start tracking your work."}
           </p>
-          {!search && statusFilter === "All" && (
-            <button
-              type="button"
-              onClick={openCreateForm}
-              className="mt-4 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Create project
-            </button>
-          )}
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Create a project or change your filters.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => {
-            const progress = Math.min(
-              100,
-              Math.max(0, Number(project.progress) || 0),
-            );
+            const names = getMemberNames(project.members);
+            const progress =
+              project.status === "Completed"
+                ? 100
+                : project.status === "Planning"
+                  ? 0
+                  : Number(project.progress || 0);
 
             return (
               <article
                 key={project._id}
-                className="flex flex-col rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900"
+                className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <div className="rounded-lg bg-emerald-50 p-2.5 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                      <FolderKanban size={21} />
-                    </div>
-
-                    <div className="min-w-0">
-                      <h2 className="break-words font-semibold text-gray-900 dark:text-white">
-                        {project.name}
-                      </h2>
-                      <span
-                        className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(project.status)}`}
-                      >
-                        {project.status}
-                      </span>
-                    </div>
+                  <div className="min-w-0">
+                    <h3 className="break-words font-semibold text-gray-900 dark:text-white">
+                      {project.name}
+                    </h3>
+                    <span
+                      className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
+                        statusClasses[project.status] || statusClasses.Planning
+                      }`}
+                    >
+                      {project.status}
+                    </span>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1">
+                  <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
-                      onClick={() => handleEdit(project)}
+                      onClick={() => openEditForm(project)}
                       aria-label={`Edit ${project.name}`}
-                      title="Edit project"
-                      className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-emerald-600 dark:hover:bg-gray-800"
+                      className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       <Pencil size={16} />
                     </button>
-
                     <button
                       type="button"
                       onClick={() => handleDelete(project)}
-                      disabled={deletingId === project._id}
                       aria-label={`Delete ${project.name}`}
-                      title="Delete project"
-                      className="rounded-lg p-2 text-gray-500 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/30"
+                      className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40"
                     >
-                      {deletingId === project._id ? (
-                        <LoaderCircle size={16} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
+                      <Trash2 size={16} />
                     </button>
                   </div>
                 </div>
 
-                <p className="mt-4 min-h-10 text-sm leading-6 text-gray-500 dark:text-gray-400">
+                <p className="mt-4 min-h-10 text-sm leading-6 text-gray-600 dark:text-gray-400">
                   {project.description}
                 </p>
 
@@ -418,39 +316,45 @@ function Projects() {
                     <span className="text-gray-500 dark:text-gray-400">
                       Progress
                     </span>
-                    <span className="font-semibold text-gray-900 dark:text-white">
+                    <span className="font-medium text-gray-900 dark:text-white">
                       {progress}%
                     </span>
                   </div>
-
-                  <div
-                    className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
-                    role="progressbar"
-                    aria-label={`${project.name} progress`}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress}
-                  >
+                  <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
                     <div
-                      className={`h-full rounded-full transition-all ${
-                        progress === 100 ? "bg-emerald-600" : "bg-emerald-500"
-                      }`}
+                      className="h-full rounded-full bg-emerald-500 transition-all"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
                 </div>
 
-                <div className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
-                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    <CalendarDays size={15} />
-                    {formatDeadline(project.deadline)}
+                <div className="mt-5 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <CalendarDays size={16} />
+                  <span>Due {formatDate(project.deadline)}</span>
+                </div>
+
+                <div className="mt-5 border-t border-gray-100 pt-4 dark:border-gray-800">
+                  <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <Users size={16} />
+                    Collaborators
                   </div>
 
-                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    <Users size={15} />
-                    {project.members}{" "}
-                    {project.members === 1 ? "member" : "members"}
-                  </div>
+                  {names.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {names.map((name, index) => (
+                        <span
+                          key={`${project._id}-${index}`}
+                          className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      No collaborators yet.
+                    </p>
+                  )}
                 </div>
               </article>
             );
@@ -459,205 +363,131 @@ function Projects() {
       )}
 
       {showForm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !saving) {
-              setShowForm(false);
-            }
-          }}
-        >
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="project-form-title"
-            className="my-8 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl dark:bg-gray-900"
+            className="my-auto w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-950"
           >
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <div>
-                <h2
-                  id="project-form-title"
-                  className="text-xl font-bold text-gray-900 dark:text-white"
-                >
-                  {editingProject ? "Edit Project" : "Create Project"}
-                </h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Enter the project details below.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                disabled={saving}
-                aria-label="Close form"
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 disabled:opacity-50 dark:hover:bg-gray-800"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {formError && (
-              <div
-                role="alert"
-                className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/30 dark:text-red-300"
-              >
-                {formError}
-              </div>
-            )}
+            <h2
+              id="project-form-title"
+              className="mb-5 text-lg font-semibold text-gray-900 dark:text-white"
+            >
+              {editingProject ? "Edit Project" : "Create Project"}
+            </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label
-                  htmlFor="name"
+                  htmlFor="project-name"
                   className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Project name *
+                  Project Name
                 </label>
                 <input
-                  id="name"
+                  id="project-name"
                   name="name"
-                  type="text"
-                  maxLength={100}
-                  required
                   value={formData.name}
-                  onChange={handleFormChange}
-                  placeholder="e.g. Website Redesign"
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  onChange={handleChange}
+                  required
+                  maxLength={100}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 />
               </div>
 
               <div>
                 <label
-                  htmlFor="description"
+                  htmlFor="project-description"
                   className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
                 >
-                  Description *
+                  Description
                 </label>
                 <textarea
-                  id="description"
+                  id="project-description"
                   name="description"
-                  rows={3}
-                  maxLength={500}
-                  required
                   value={formData.description}
-                  onChange={handleFormChange}
-                  placeholder="What is this project about?"
-                  className="w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  onChange={handleChange}
+                  required
+                  maxLength={500}
+                  rows={3}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label
-                    htmlFor="status"
-                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Status *
-                  </label>
-                  <select
-                    id="status"
-                    name="status"
-                    value={formData.status}
-                    onChange={(event) => handleStatusChange(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                  >
-                    <option value="Planning">Planning</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="deadline"
-                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Deadline *
-                  </label>
-                  <input
-                    id="deadline"
-                    name="deadline"
-                    type="date"
-                    required
-                    min={new Date().toLocaleDateString("en-CA")}
-                    value={formData.deadline}
-                    onChange={handleFormChange}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                  />
-                </div>
+              <div>
+                <label
+                  htmlFor="project-status"
+                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Status
+                </label>
+                <select
+                  id="project-status"
+                  name="status"
+                  value={formData.status}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                >
+                  <option>Planning</option>
+                  <option>In Progress</option>
+                  <option>Completed</option>
+                </select>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {formData.status === "In Progress" && (
                 <div>
                   <label
-                    htmlFor="members"
+                    htmlFor="project-progress"
                     className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
-                    Team members *
+                    Progress (1–99%)
                   </label>
                   <input
-                    id="members"
-                    name="members"
-                    type="number"
-                    min="1"
-                    max="100"
-                    step="1"
-                    required
-                    value={formData.members}
-                    onChange={handleFormChange}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="progress"
-                    className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    Progress (%)
-                  </label>
-                  <input
-                    id="progress"
+                    id="project-progress"
                     name="progress"
                     type="number"
                     min="1"
                     max="99"
-                    step="1"
-                    required={formData.status === "In Progress"}
-                    disabled={formData.status !== "In Progress"}
                     value={formData.progress}
-                    onChange={handleFormChange}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-emerald-500 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-gray-700 dark:bg-gray-950 dark:text-white dark:disabled:bg-gray-800"
+                    onChange={handleChange}
+                    required
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                   />
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {formData.status === "Planning"
-                      ? "Planning projects start at 0%."
-                      : formData.status === "Completed"
-                        ? "Completed projects are set to 100%."
-                        : "Enter a whole number from 1 to 99."}
-                  </p>
                 </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="project-deadline"
+                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Deadline
+                </label>
+                <input
+                  id="project-deadline"
+                  name="deadline"
+                  type="date"
+                  value={formData.deadline}
+                  onChange={handleChange}
+                  required
+                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
+                />
               </div>
 
-              <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowForm(false)}
-                  disabled={saving}
-                  className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                  onClick={closeForm}
+                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300"
                 >
                   Cancel
                 </button>
-
                 <button
                   type="submit"
                   disabled={saving}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
-                  {saving && (
-                    <LoaderCircle size={16} className="animate-spin" />
-                  )}
                   {saving
                     ? "Saving..."
                     : editingProject

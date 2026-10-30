@@ -1,27 +1,29 @@
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const projectsApi = axios.create({
-  baseURL: `${API_URL}/api/projects`,
-});
+import api from "./axios";
 
 export async function getProjects() {
-  const response = await projectsApi.get("/");
+  const response = await api.get("/api/projects");
   return response.data;
 }
 
 export async function createProject(projectData) {
-  const response = await projectsApi.post("/", projectData);
+  const response = await api.post("/api/projects", projectData);
   return response.data;
 }
 
 export async function updateProject(id, projectData) {
-  const response = await projectsApi.put(`/${id}`, projectData);
+  const response = await api.put(`/api/projects/${id}`, projectData);
   return response.data;
 }
 
 export async function deleteProject(id) {
-  const response = await projectsApi.delete(`/${id}`);
+  const response = await api.delete(`/api/projects/${id}`);
+  return response.data;
+}
+
+export async function addProjectMember(projectId, email) {
+  const response = await api.post(`/api/projects/${projectId}/members`, {
+    email,
+  });
+
   return response.data;
 }

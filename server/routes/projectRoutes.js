@@ -1,5 +1,7 @@
 const express = require("express");
 const Project = require("../models/Project");
+const Workspace = require("../models/Workspace");
+const User = require("../models/User");
 
 const router = express.Router();
 
@@ -9,19 +11,37 @@ function isValidId(id) {
   return /^[a-f\d]{24}$/i.test(id);
 }
 
+async function getUserWorkspace(userId) {
+  return Workspace.findOne({ members: userId });
+}
+
+// Get projects the current user owns or belongs to
 router.get("/", async (req, res) => {
   try {
-    const projects = await Project.find().sort({ createdAt: -1 });
-    res.status(200).json(projects);
+    const projects = await Project.find({
+      members: req.user.userId,
+    })
+      .populate("members", "name")
+      .sort({ createdAt: -1 });
+
+    res.json(projects);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch projects" });
   }
 });
 
-// POST /api/projects - Create a project
+// Create a project
 router.post("/", async (req, res) => {
   try {
-    const { name, description, status, deadline, members } = req.body;
+    const workspace = await getUserWorkspace(req.user.userId);
+
+    if (!workspace) {
+      return res.status(404).json({
+        message: "No workspace found for this account",
+      });
+    }
+
+    const { name, description, status, deadline } = req.body;
 
     let progress = 0;
 
@@ -48,9 +68,13 @@ router.post("/", async (req, res) => {
       description,
       status,
       deadline,
-      members,
       progress,
+      workspace: workspace._id,
+      owner: req.user.userId,
+      members: [req.user.userId],
     });
+
+    await project.populate("members", "name");
 
     res.status(201).json(project);
   } catch (error) {
@@ -62,10 +86,19 @@ router.post("/", async (req, res) => {
   }
 });
 
-router.get("/:id", async (req, res) => {
+// Add a registered user to a project
+router.post("/:id/members", async (req, res) => {
   try {
     if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    const { email } = req.body;
+
+    if (typeof email !== "string" || !email.trim()) {
+      return res.status(400).json({
+        message: "A valid email address is required",
+      });
     }
 
     const project = await Project.findById(req.params.id);
@@ -74,16 +107,87 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    res.status(200).json(project);
+    if (project.owner.toString() !== req.user.userId) {
+      return res.status(403).json({
+        message: "Only the project owner can add members",
+      });
+    }
+
+    const user = await User.findOne({
+      email: email.trim().toLowerCase(),
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "No registered CoWork user found with this email",
+      });
+    }
+
+    const alreadyMember = project.members.some(
+      (memberId) => memberId.toString() === user._id.toString(),
+    );
+
+    if (alreadyMember) {
+      return res.status(409).json({
+        message: "This user is already a member of the project",
+      });
+    }
+
+    project.members.push(user._id);
+    await project.save();
+    await project.populate("members", "name");
+
+    res.status(200).json({
+      message: "Collaborator added successfully",
+      project,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to add collaborator" });
+  }
+});
+
+// Get one project, only if the user is a member
+router.get("/:id", async (req, res) => {
+  try {
+    if (!isValidId(req.params.id)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    const project = await Project.findOne({
+      _id: req.params.id,
+      members: req.user.userId,
+    }).populate("members", "name");
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    res.json(project);
   } catch (error) {
     res.status(500).json({ message: "Failed to fetch project" });
   }
 });
 
+// Update project (owner only)
 router.put("/:id", async (req, res) => {
   try {
     if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: "Invalid project ID" });
+    }
+
+    const project = await Project.findOne({
+      _id: req.params.id,
+      members: req.user.userId,
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    if (project.owner.toString() !== req.user.userId) {
+      return res.status(403).json({
+        message: "Only the project owner can edit this project",
+      });
     }
 
     const allowedFields = [
@@ -92,7 +196,6 @@ router.put("/:id", async (req, res) => {
       "status",
       "progress",
       "deadline",
-      "members",
     ];
 
     const updates = {};
@@ -103,9 +206,9 @@ router.put("/:id", async (req, res) => {
       }
     }
 
-    if (Object.keys(updates).length === 0) {
+    if (!Object.keys(updates).length) {
       return res.status(400).json({
-        message: "Please provide at least one field to update.",
+        message: "Please provide at least one field to update",
       });
     }
 
@@ -122,47 +225,39 @@ router.put("/:id", async (req, res) => {
       updates.progress = 0;
     } else if (updates.status === "In Progress") {
       if (updates.progress === undefined) {
-        const existingProject = await Project.findById(req.params.id);
-
-        if (!existingProject) {
-          return res.status(404).json({ message: "Project not found" });
-        }
-
-        updates.progress = existingProject.progress || 1;
+        updates.progress = project.progress || 1;
       }
 
-      const progress = Number(updates.progress);
+      updates.progress = Number(updates.progress);
 
-      if (!Number.isInteger(progress) || progress < 1 || progress > 99) {
+      if (
+        !Number.isInteger(updates.progress) ||
+        updates.progress < 1 ||
+        updates.progress > 99
+      ) {
         return res.status(400).json({
-          message:
-            "Progress must be a whole number from 1 to 99 for projects in progress.",
+          message: "Progress must be a whole number from 1 to 99",
         });
       }
-
-      updates.progress = progress;
     } else if (updates.progress !== undefined) {
-      const progress = Number(updates.progress);
+      updates.progress = Number(updates.progress);
 
-      if (!Number.isInteger(progress) || progress < 0 || progress > 100) {
+      if (
+        !Number.isInteger(updates.progress) ||
+        updates.progress < 0 ||
+        updates.progress > 100
+      ) {
         return res.status(400).json({
-          message: "Progress must be a whole number from 0 to 100.",
+          message: "Progress must be a whole number from 0 to 100",
         });
       }
-
-      updates.progress = progress;
     }
 
-    const project = await Project.findByIdAndUpdate(req.params.id, updates, {
-      new: true,
-      runValidators: true,
-    });
+    Object.assign(project, updates);
+    await project.save();
+    await project.populate("members", "name");
 
-    if (!project) {
-      return res.status(404).json({ message: "Project not found" });
-    }
-
-    res.status(200).json(project);
+    res.json(project);
   } catch (error) {
     if (error.name === "ValidationError" || error.name === "CastError") {
       return res.status(400).json({ message: error.message });
@@ -172,21 +267,31 @@ router.put("/:id", async (req, res) => {
   }
 });
 
+// Delete project (owner only)
 router.delete("/:id", async (req, res) => {
   try {
     if (!isValidId(req.params.id)) {
       return res.status(400).json({ message: "Invalid project ID" });
     }
 
-    const project = await Project.findByIdAndDelete(req.params.id);
+    const project = await Project.findOne({
+      _id: req.params.id,
+      members: req.user.userId,
+    });
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
     }
 
-    res.status(200).json({
-      message: "Project deleted successfully",
-    });
+    if (project.owner.toString() !== req.user.userId) {
+      return res.status(403).json({
+        message: "Only the project owner can delete this project",
+      });
+    }
+
+    await Project.findByIdAndDelete(project._id);
+
+    res.json({ message: "Project deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: "Failed to delete project" });
   }

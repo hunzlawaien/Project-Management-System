@@ -7,6 +7,7 @@ import {
   ListTodo,
   Users,
   Mail,
+  CalendarDays,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -98,6 +99,34 @@ function Dashboard() {
   const recentTasks = tasks.slice(0, 5);
   const recentTeamMembers = teamMembers.slice(0, 5);
 
+  let user = {};
+
+  try {
+    user = JSON.parse(localStorage.getItem("user") || "{}");
+  } catch {
+    user = {};
+  }
+
+  const currentUserId = String(user._id || user.id || "");
+
+  const myTasks = tasks.filter((task) => {
+    const assigneeId =
+      typeof task.assignee === "object" ? task.assignee?._id : task.assignee;
+
+    return currentUserId !== "" && String(assigneeId || "") === currentUserId;
+  });
+
+  const upcomingMyTasks = [...myTasks]
+    .filter((task) => task.status !== "Completed")
+    .sort((a, b) => {
+      if (!a.dueDate && !b.dueDate) return 0;
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+
+      return new Date(a.dueDate) - new Date(b.dueDate);
+    })
+    .slice(0, 5);
+
   function formatDeadline(deadline) {
     if (!deadline) return "No deadline";
 
@@ -114,6 +143,47 @@ function Dashboard() {
     });
   }
 
+  function getTaskDeadlineLabel(dueDate) {
+    if (!dueDate) return "No due date";
+
+    const due = new Date(dueDate);
+
+    if (Number.isNaN(due.getTime())) {
+      return "Invalid date";
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+
+    const difference = Math.round(
+      (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
+    if (difference < 0) {
+      return `${Math.abs(difference)} day(s) overdue`;
+    }
+
+    if (difference === 0) return "Due today";
+    if (difference === 1) return "Due tomorrow";
+
+    return `Due ${formatDeadline(dueDate)}`;
+  }
+
+  function isTaskOverdue(dueDate) {
+    if (!dueDate) return false;
+
+    const due = new Date(dueDate);
+
+    if (Number.isNaN(due.getTime())) return false;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+
+    return due < today;
+  }
+
   function getStatusStyle(status) {
     if (status === "Completed") {
       return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
@@ -127,13 +197,25 @@ function Dashboard() {
   }
 
   function getInitials(name) {
-    return name
+    return (name || "U")
       .split(" ")
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0])
       .join("")
       .toUpperCase();
+  }
+
+  function getPriorityStyle(priority) {
+    if (priority === "High") {
+      return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300";
+    }
+
+    if (priority === "Medium") {
+      return "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300";
+    }
+
+    return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
   }
 
   return (
@@ -156,6 +238,7 @@ function Dashboard() {
         </div>
       )}
 
+      {/* Dashboard statistics */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => (
           <StatCard
@@ -166,6 +249,7 @@ function Dashboard() {
         ))}
       </section>
 
+      {/* Recent projects */}
       <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
@@ -181,8 +265,7 @@ function Dashboard() {
             to="/projects"
             className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
-            View all
-            <span aria-hidden="true">→</span>
+            View all <span aria-hidden="true">→</span>
           </Link>
         </div>
 
@@ -198,15 +281,12 @@ function Dashboard() {
         ) : recentProjects.length === 0 ? (
           <div className="py-10 text-center">
             <FolderKanban size={36} className="mx-auto mb-3 text-gray-400" />
-
             <p className="font-medium text-gray-900 dark:text-white">
               No projects yet
             </p>
-
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Create your first project to see your progress here.
             </p>
-
             <Link
               to="/projects"
               className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
@@ -216,56 +296,143 @@ function Dashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            {recentProjects.map((project) => (
-              <div key={project._id}>
-                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {project.name}
-                    </p>
+            {recentProjects.map((project) => {
+              const progress = Math.min(
+                100,
+                Math.max(0, Number(project.progress) || 0),
+              );
 
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Deadline: {formatDeadline(project.deadline)}
-                    </p>
+              return (
+                <div key={project._id}>
+                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {project.name}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Deadline: {formatDeadline(project.deadline)}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(project.status)}`}
+                      >
+                        {project.status}
+                      </span>
+                      <span className="w-10 text-right text-xs text-gray-500 dark:text-gray-400">
+                        {progress}%
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(project.status)}`}
-                    >
-                      {project.status}
-                    </span>
-
-                    <span className="w-10 text-right text-xs text-gray-500 dark:text-gray-400">
-                      {project.progress ?? 0}%
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
-                  role="progressbar"
-                  aria-label={`${project.name} progress`}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.min(
-                    100,
-                    Math.max(0, Number(project.progress) || 0),
-                  )}
-                >
                   <div
-                    className="h-full rounded-full bg-emerald-600 transition-all"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, Number(project.progress) || 0))}%`,
-                    }}
-                  />
+                    className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
+                    role="progressbar"
+                    aria-label={`${project.name} progress`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={progress}
+                  >
+                    <div
+                      className="h-full rounded-full bg-emerald-600 transition-all"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
 
+      {/* My tasks */}
+      <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">
+              My Tasks
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Your assigned tasks and upcoming deadlines.
+            </p>
+          </div>
+
+          <Link
+            to="/my-tasks"
+            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
+          >
+            View all <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            Loading your tasks...
+          </div>
+        ) : error ? (
+          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+            Your tasks are unavailable.
+          </p>
+        ) : upcomingMyTasks.length === 0 ? (
+          <div className="py-8 text-center">
+            <ListTodo size={32} className="mx-auto mb-3 text-gray-400" />
+            <p className="font-medium text-gray-900 dark:text-white">
+              No pending tasks assigned to you
+            </p>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Tasks assigned to your account will appear here.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {upcomingMyTasks.map((task) => {
+              const overdue = isTaskOverdue(task.dueDate);
+
+              return (
+                <div
+                  key={task._id}
+                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+                      {task.title}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                      Project: {task.project?.name || "Unknown project"}
+                    </p>
+                    <p
+                      className={`mt-2 flex items-center gap-1 text-xs ${
+                        overdue
+                          ? "font-medium text-red-600 dark:text-red-400"
+                          : "text-gray-500 dark:text-gray-400"
+                      }`}
+                    >
+                      <CalendarDays size={14} />
+                      {getTaskDeadlineLabel(task.dueDate)}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(task.status)}`}
+                    >
+                      {task.status}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-xs font-medium ${getPriorityStyle(task.priority)}`}
+                    >
+                      {task.priority} priority
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* Recent tasks across accessible projects */}
       <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
@@ -281,8 +448,7 @@ function Dashboard() {
             to="/tasks"
             className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
-            View all
-            <span aria-hidden="true">→</span>
+            View all <span aria-hidden="true">→</span>
           </Link>
         </div>
 
@@ -320,8 +486,9 @@ function Dashboard() {
                   >
                     {task.status}
                   </span>
-
-                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${getPriorityStyle(task.priority)}`}
+                  >
                     {task.priority} priority
                   </span>
                 </div>
@@ -331,6 +498,7 @@ function Dashboard() {
         )}
       </section>
 
+      {/* Recent team members */}
       <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
@@ -346,8 +514,7 @@ function Dashboard() {
             to="/team"
             className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
-            View all
-            <span aria-hidden="true">→</span>
+            View all <span aria-hidden="true">→</span>
           </Link>
         </div>
 

@@ -29,12 +29,28 @@ const projectSchema = new mongoose.Schema(
       type: Date,
       required: [true, "Project deadline is required"],
     },
-    members: {
-      type: Number,
-      min: 1,
-      max: 100,
-      default: 1,
+
+    // The workspace that owns this project
+    workspace: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: true,
     },
+
+    // The user who created the project
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    // Registered users who collaborate on the project
+    members: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
   },
   {
     timestamps: true,

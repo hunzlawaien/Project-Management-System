@@ -4,34 +4,34 @@ const teamMemberSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Member name is required"],
+      required: [true, "Name is required"],
       trim: true,
-      maxlength: 100,
     },
     email: {
       type: String,
-      required: [true, "Email address is required"],
+      required: [true, "Email is required"],
       trim: true,
       lowercase: true,
-      unique: true,
-      maxlength: 150,
     },
     role: {
       type: String,
-      required: [true, "Job role is required"],
+      required: [true, "Role is required"],
       trim: true,
-      maxlength: 100,
     },
     department: {
       type: String,
       trim: true,
       default: "",
-      maxlength: 100,
+    },
+    workspace: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workspace",
+      required: true,
     },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
+
+teamMemberSchema.index({ workspace: 1, email: 1 }, { unique: true });
 
 module.exports = mongoose.model("TeamMember", teamMemberSchema);

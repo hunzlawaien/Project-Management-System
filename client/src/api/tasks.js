@@ -1,27 +1,21 @@
-import axios from "axios";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-
-const tasksApi = axios.create({
-  baseURL: `${API_URL}/api/tasks`,
-});
+import api from "./axios";
 
 export async function getTasks() {
-  const response = await tasksApi.get("/");
+  const response = await api.get("/api/tasks");
   return response.data;
 }
 
 export async function createTask(taskData) {
-  const response = await tasksApi.post("/", taskData);
+  const response = await api.post("/api/tasks", taskData);
   return response.data;
 }
 
 export async function updateTask(id, taskData) {
-  const response = await tasksApi.put(`/${id}`, taskData);
+  const response = await api.put(`/api/tasks/${id}`, taskData);
   return response.data;
 }
 
 export async function deleteTask(id) {
-  const response = await tasksApi.delete(`/${id}`);
+  const response = await api.delete(`/api/tasks/${id}`);
   return response.data;
 }
