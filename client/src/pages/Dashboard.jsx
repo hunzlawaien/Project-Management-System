@@ -55,7 +55,7 @@ function Dashboard() {
 
       const teamData = await getTeamMembers();
 
-      setTeamMembers(Array.isArray(teamData.members) ? teamData.members : []);
+      setTeamMembers(Array.isArray(teamData) ? teamData : []);
     } catch (err) {
       setTeamMembers([]);
       setTeamError(
@@ -89,13 +89,13 @@ function Dashboard() {
     {
       title: "Total Projects",
       value: totalProjects,
-      description: "Projects created",
+      description: "Projects you can access",
       icon: FolderKanban,
     },
     {
       title: "Total Tasks",
       value: totalTasks,
-      description: "Tasks across all projects",
+      description: "Tasks across your projects",
       icon: ListTodo,
     },
     {
@@ -113,13 +113,19 @@ function Dashboard() {
     {
       title: "Team Members",
       value: teamMembers.length,
-      description: "Members in your directory",
+      description: "Unique project collaborators",
       icon: Users,
     },
   ];
 
-  const recentProjects = projects.slice(0, 5);
-  const recentTasks = tasks.slice(0, 5);
+  const recentProjects = [...projects]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+
+  const recentTasks = [...tasks]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 5);
+
   const recentTeamMembers = teamMembers.slice(0, 5);
 
   let user = {};
@@ -463,7 +469,7 @@ function Dashboard() {
         )}
       </section>
 
-      {/* Recent tasks across accessible projects */}
+      {/* Recent tasks */}
       <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
@@ -534,10 +540,10 @@ function Dashboard() {
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <h2 className="font-semibold text-gray-900 dark:text-white">
-              Recent Team Members
+              Project Collaborators
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              The latest members added to your team.
+              People collaborating across your projects.
             </p>
           </div>
 
@@ -552,7 +558,7 @@ function Dashboard() {
         {teamLoading ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500 dark:text-gray-400">
             <RefreshCw size={18} className="animate-spin" />
-            Loading team members...
+            Loading collaborators...
           </div>
         ) : teamError ? (
           <div className="py-8 text-center">
@@ -571,10 +577,10 @@ function Dashboard() {
           <div className="py-8 text-center">
             <Users size={32} className="mx-auto mb-3 text-gray-400" />
             <p className="font-medium text-gray-900 dark:text-white">
-              No team members yet
+              No collaborators yet
             </p>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Add a member to see them on your dashboard.
+              Add members to your projects to see them here.
             </p>
             <Link
               to="/team"
@@ -587,8 +593,28 @@ function Dashboard() {
           <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {recentTeamMembers.map((member) => (
               <div key={member._id} className="flex items-center gap-3 py-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  {getInitials(member.name)}
+                {/* Profile picture with initials fallback */}
+                <div className="relative h-10 w-10 shrink-0">
+                  {member.profilePicture && (
+                    <img
+                      src={member.profilePicture}
+                      alt={member.name || "Profile"}
+                      className="h-10 w-10 rounded-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                        event.currentTarget.nextElementSibling.style.display =
+                          "flex";
+                      }}
+                    />
+                  )}
+
+                  <div
+                    className={`absolute inset-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 ${
+                      member.profilePicture ? "hidden" : "flex"
+                    }`}
+                  >
+                    {getInitials(member.name)}
+                  </div>
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -597,6 +623,12 @@ function Dashboard() {
                   </p>
                   <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
                     {member.email}
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    {member.projects?.length || 0}{" "}
+                    {(member.projects?.length || 0) === 1
+                      ? "project"
+                      : "projects"}
                   </p>
                 </div>
 

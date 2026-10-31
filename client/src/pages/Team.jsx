@@ -1,34 +1,22 @@
 import { useEffect, useState } from "react";
-import { Search, Users, Mail, Plus, Trash2, X } from "lucide-react";
-import { getTeamMembers, addTeamMember, removeTeamMember } from "../api/team";
+import { Search, Users, Mail, FolderKanban } from "lucide-react";
+import { getTeamMembers } from "../api/team";
 
 function Team() {
   const [members, setMembers] = useState([]);
-  const [isCreator, setIsCreator] = useState(false);
-  const [creatorId, setCreatorId] = useState("");
   const [search, setSearch] = useState("");
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState("");
-  const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
-  const [formError, setFormError] = useState("");
-  const [success, setSuccess] = useState("");
 
   async function loadMembers() {
     try {
       setError("");
 
       const data = await getTeamMembers();
-
-      setMembers(data.members);
-      setIsCreator(data.isCreator);
-      setCreatorId(data.creatorId);
+      setMembers(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(
-        err.response?.data?.message ||
-          "Could not load team members. Check your backend.",
+        err.response?.data?.message || "Could not load project collaborators.",
       );
     } finally {
       setLoading(false);
@@ -39,85 +27,36 @@ function Team() {
     loadMembers();
   }, []);
 
-  function openAddForm() {
-    setEmail("");
-    setFormError("");
-    setSuccess("");
-    setShowForm(true);
-  }
-
-  function closeForm() {
-    setShowForm(false);
-    setEmail("");
-    setFormError("");
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-
-    try {
-      setSaving(true);
-      setFormError("");
-      setSuccess("");
-
-      const result = await addTeamMember(email.trim());
-
-      if (result.members) {
-        setMembers(result.members);
-      } else {
-        await loadMembers();
-      }
-
-      setSuccess(result.message || "Team member added successfully.");
-      closeForm();
-    } catch (err) {
-      setFormError(
-        err.response?.data?.message || "Could not add this team member.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleRemove(member) {
-    const confirmed = window.confirm(
-      `Are you sure you want to remove ${member.name} from the shared team?`,
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setDeletingId(member._id);
-      setError("");
-      setSuccess("");
-
-      const result = await removeTeamMember(member._id);
-
-      setMembers((previous) =>
-        previous.filter((item) => item._id !== member._id),
-      );
-
-      setSuccess(result.message || "Team member removed successfully.");
-    } catch (err) {
-      setError(
-        err.response?.data?.message || "Could not remove this team member.",
-      );
-    } finally {
-      setDeletingId("");
-    }
+  function getInitials(name) {
+    return (name || "?")
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase();
   }
 
   const searchText = search.trim().toLowerCase();
 
-  const filteredMembers = members.filter((member) =>
-    [member.name, member.email].some((value) =>
-      (value || "").toLowerCase().includes(searchText),
-    ),
-  );
+  const filteredMembers = members.filter((member) => {
+    const matchesName = (member.name || "").toLowerCase().includes(searchText);
+
+    const matchesEmail = (member.email || "")
+      .toLowerCase()
+      .includes(searchText);
+
+    const matchesProject = (member.projects || []).some((project) =>
+      (project.name || "").toLowerCase().includes(searchText),
+    );
+
+    return matchesName || matchesEmail || matchesProject;
+  });
 
   return (
     <div className="space-y-6 p-4 sm:p-6 lg:p-8">
       <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
+        {/* Page heading */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h2 className="font-semibold text-gray-900 dark:text-white">
@@ -125,44 +64,35 @@ function Team() {
             </h2>
 
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              View and manage registered CoWork team members.
+              View collaborators working across your projects.
             </p>
 
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {members.length} {members.length === 1 ? "member" : "members"}
+              {members.length}{" "}
+              {members.length === 1 ? "collaborator" : "collaborators"}
             </p>
           </div>
-
-          {isCreator && (
-            <button
-              type="button"
-              onClick={openAddForm}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              <Plus size={18} />
-              Add Team Member
-            </button>
-          )}
         </div>
 
+        {/* Error message */}
         {error && (
-          <p
+          <div
             role="alert"
             className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
           >
             {error}
-          </p>
+
+            <button
+              type="button"
+              onClick={loadMembers}
+              className="ml-2 font-medium underline"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
-        {success && (
-          <p
-            role="status"
-            className="mt-4 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-          >
-            {success}
-          </p>
-        )}
-
+        {/* Search */}
         <div className="relative mt-6 max-w-md">
           <Search
             size={18}
@@ -172,169 +102,112 @@ function Team() {
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search team members..."
-            aria-label="Search team members"
+            placeholder="Search collaborators or projects..."
+            aria-label="Search collaborators"
             className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
           />
         </div>
 
+        {/* Loading state */}
         {loading ? (
           <p className="py-12 text-center text-sm text-gray-500">
-            Loading team members...
+            Loading collaborators...
           </p>
         ) : filteredMembers.length === 0 ? (
+          /* Empty state */
           <div className="py-12 text-center">
             <Users size={32} className="mx-auto mb-3 text-gray-400" />
 
             <p className="font-medium text-gray-900 dark:text-white">
-              {searchText ? "No team members found" : "No team members yet"}
+              {searchText ? "No collaborators found" : "No collaborators yet"}
             </p>
 
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               {searchText
-                ? "Try searching with another name or email."
-                : isCreator
-                  ? "Add a registered CoWork user to get started."
-                  : "There are no members to display."}
+                ? "Try searching with another name, email, or project."
+                : "Add members to your projects to see them here."}
             </p>
           </div>
         ) : (
+          /* Collaborator cards */
           <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {filteredMembers.map((member) => (
               <article
                 key={member._id}
                 className="rounded-xl border border-gray-200 p-5 dark:border-gray-800"
               >
+                {/* Collaborator information */}
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                    {(member.name || "?")
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((part) => part[0])
-                      .join("")
-                      .toUpperCase()}
+                  {member.profilePicture ? (
+                    <img
+                      src={member.profilePicture}
+                      alt={member.name || "Profile"}
+                      className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.style.display = "none";
+                        event.currentTarget.nextElementSibling.style.display =
+                          "flex";
+                      }}
+                    />
+                  ) : null}
+
+                  <div
+                    className={`h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 ${
+                      member.profilePicture ? "hidden" : "flex"
+                    }`}
+                  >
+                    {getInitials(member.name)}
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate font-medium text-gray-900 dark:text-white">
-                      {member.name}
+                      {member.name || "Unnamed User"}
                     </h3>
 
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      {member._id === creatorId
-                        ? "Team Creator"
-                        : "CoWork Member"}
+                      {member.projects?.length || 0}{" "}
+                      {(member.projects?.length || 0) === 1
+                        ? "Project"
+                        : "Projects"}
                     </p>
                   </div>
-
-                  {isCreator && member._id !== creatorId && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(member)}
-                      disabled={deletingId === member._id}
-                      aria-label={`Remove ${member.name} from team`}
-                      title="Remove team member"
-                      className="rounded-lg p-2 text-gray-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-950/40"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
                 </div>
 
+                {/* Email */}
                 <div className="mt-5 flex items-center gap-2 border-t border-gray-100 pt-4 text-sm text-gray-500 dark:border-gray-800 dark:text-gray-400">
                   <Mail size={16} className="shrink-0" />
                   <span className="truncate">{member.email}</span>
+                </div>
+
+                {/* Associated projects */}
+                <div className="mt-4">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <FolderKanban size={16} />
+                    <span>Projects</span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {member.projects?.length > 0 ? (
+                      member.projects.map((project) => (
+                        <span
+                          key={project._id}
+                          className="rounded-md bg-gray-100 px-2.5 py-1.5 text-xs text-gray-600 dark:bg-gray-900 dark:text-gray-300"
+                        >
+                          {project.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-gray-500">
+                        No projects assigned
+                      </span>
+                    )}
+                  </div>
                 </div>
               </article>
             ))}
           </div>
         )}
       </section>
-
-      {showForm && isCreator && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/50 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="team-form-title"
-            className="my-auto w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-800 dark:bg-gray-950"
-          >
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <h2
-                  id="team-form-title"
-                  className="text-lg font-semibold text-gray-900 dark:text-white"
-                >
-                  Add Team Member
-                </h2>
-
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Enter the email address of a registered CoWork user.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeForm}
-                aria-label="Close form"
-                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label
-                  htmlFor="team-member-email"
-                  className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  Registered User Email
-                </label>
-
-                <input
-                  id="team-member-email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@example.com"
-                  required
-                  maxLength={254}
-                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none focus:border-emerald-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
-                />
-              </div>
-
-              {formError && (
-                <p
-                  role="alert"
-                  className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300"
-                >
-                  {formError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeForm}
-                  className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={saving || !email.trim()}
-                  className="rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? "Adding..." : "Add Member"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

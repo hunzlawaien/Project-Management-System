@@ -6,6 +6,9 @@ function MyTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const tasksPerPage = 15;
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -26,6 +29,7 @@ function MyTasks() {
       });
 
       setTasks(myTasks);
+      setCurrentPage(1);
     } catch (err) {
       setError(err.response?.data?.message || "Unable to load your tasks.");
     } finally {
@@ -36,6 +40,23 @@ function MyTasks() {
   useEffect(() => {
     loadMyTasks();
   }, []);
+
+  const totalPages = Math.ceil(tasks.length / tasksPerPage);
+  const startIndex = (currentPage - 1) * tasksPerPage;
+  const paginatedTasks = tasks.slice(startIndex, startIndex + tasksPerPage);
+
+  useEffect(() => {
+    if (totalPages === 0) {
+      if (currentPage !== 1) {
+        setCurrentPage(1);
+      }
+      return;
+    }
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const statusStyles = {
     "To Do": "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -104,66 +125,120 @@ function MyTasks() {
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
-                <tr>
-                  <th className="px-5 py-4 font-medium">Task</th>
-                  <th className="px-5 py-4 font-medium">Project</th>
-                  <th className="px-5 py-4 font-medium">Status</th>
-                  <th className="px-5 py-4 font-medium">Priority</th>
-                  <th className="px-5 py-4 font-medium">Due Date</th>
-                </tr>
-              </thead>
+        <>
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+                  <tr>
+                    <th className="px-5 py-4 font-medium">Task</th>
+                    <th className="px-5 py-4 font-medium">Project</th>
+                    <th className="px-5 py-4 font-medium">Status</th>
+                    <th className="px-5 py-4 font-medium">Priority</th>
+                    <th className="px-5 py-4 font-medium">Due Date</th>
+                  </tr>
+                </thead>
 
-              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {tasks.map((task) => (
-                  <tr key={task._id}>
-                    <td className="px-5 py-4">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {task.title}
-                      </p>
-                      {task.description && (
-                        <p className="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">
-                          {task.description}
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {paginatedTasks.map((task) => (
+                    <tr key={task._id}>
+                      <td className="px-5 py-4">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {task.title}
                         </p>
-                      )}
-                    </td>
+                        {task.description && (
+                          <p className="mt-1 max-w-xs truncate text-xs text-gray-500 dark:text-gray-400">
+                            {task.description}
+                          </p>
+                        )}
+                      </td>
 
-                    <td className="px-5 py-4 text-gray-600 dark:text-gray-300">
-                      {task.project?.name || "—"}
-                    </td>
+                      <td className="px-5 py-4 text-gray-600 dark:text-gray-300">
+                        {task.project?.name || "—"}
+                      </td>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          statusStyles[task.status] || statusStyles["To Do"]
+                      <td className="px-5 py-4">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                            statusStyles[task.status] || statusStyles["To Do"]
+                          }`}
+                        >
+                          {task.status}
+                        </span>
+                      </td>
+
+                      <td
+                        className={`px-5 py-4 font-medium ${
+                          priorityStyles[task.priority] || ""
                         }`}
                       >
-                        {task.status}
-                      </span>
-                    </td>
+                        {task.priority}
+                      </td>
 
-                    <td
-                      className={`px-5 py-4 font-medium ${
-                        priorityStyles[task.priority] || ""
-                      }`}
-                    >
-                      {task.priority}
-                    </td>
-
-                    <td className="px-5 py-4 text-gray-600 dark:text-gray-300">
-                      {task.dueDate
-                        ? new Date(task.dueDate).toLocaleDateString()
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <td className="px-5 py-4 text-gray-600 dark:text-gray-300">
+                        {task.dueDate
+                          ? new Date(task.dueDate).toLocaleDateString()
+                          : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+
+          {totalPages > 1 && (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {startIndex + 1}–
+                {Math.min(startIndex + tasksPerPage, tasks.length)} of{" "}
+                {tasks.length} tasks
+              </p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(page - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+                >
+                  Previous
+                </button>
+
+                {Array.from(
+                  { length: totalPages },
+                  (_, index) => index + 1,
+                ).map((page) => (
+                  <button
+                    key={page}
+                    type="button"
+                    onClick={() => setCurrentPage(page)}
+                    className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                      currentPage === page
+                        ? "bg-emerald-500 text-white"
+                        : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCurrentPage((page) => Math.min(page + 1, totalPages))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

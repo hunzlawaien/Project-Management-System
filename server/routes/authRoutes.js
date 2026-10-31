@@ -7,7 +7,6 @@ const protect = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-// Register a new user and create their workspace
 router.post("/register", async (req, res) => {
   let user;
 
@@ -80,13 +79,10 @@ router.post("/register", async (req, res) => {
       },
     });
   } catch (error) {
-    // Clean up the account if workspace creation fails
     if (user && user._id) {
       try {
         await User.findByIdAndDelete(user._id);
-      } catch (cleanupError) {
-        // Keep the original registration error
-      }
+      } catch (cleanupError) {}
     }
 
     if (error.code === 11000) {
@@ -109,7 +105,6 @@ router.post("/register", async (req, res) => {
   }
 });
 
-// Log in an existing user
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;

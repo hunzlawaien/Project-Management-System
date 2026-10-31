@@ -1,16 +1,25 @@
 import api from "./axios";
 
 export async function getTeamMembers() {
-  const response = await api.get("/api/team");
-  return response.data;
-}
+  const response = await api.get("/api/projects");
 
-export async function addTeamMember(email) {
-  const response = await api.post("/api/team", { email });
-  return response.data;
-}
+  const memberMap = new Map();
 
-export async function removeTeamMember(userId) {
-  const response = await api.delete(`/api/team/${userId}`);
-  return response.data;
+  response.data.forEach((project) => {
+    project.members.forEach((member) => {
+      if (!memberMap.has(member._id)) {
+        memberMap.set(member._id, {
+          ...member,
+          projects: [],
+        });
+      }
+
+      memberMap.get(member._id).projects.push({
+        _id: project._id,
+        name: project.name,
+      });
+    });
+  });
+
+  return Array.from(memberMap.values());
 }

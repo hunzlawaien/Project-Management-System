@@ -26,6 +26,7 @@ const initialForm = {
 
 const statusOptions = ["To Do", "In Progress", "Completed"];
 const priorityOptions = ["Low", "Medium", "High"];
+const tasksPerPage = 10;
 
 function Tasks() {
   const [tasks, setTasks] = useState([]);
@@ -38,6 +39,7 @@ function Tasks() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
+  const [currentPage, setCurrentPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [form, setForm] = useState(initialForm);
@@ -241,7 +243,7 @@ function Tasks() {
     const searchText = search.toLowerCase();
 
     const matchesSearch =
-      task.title.toLowerCase().includes(searchText) ||
+      (task.title || "").toLowerCase().includes(searchText) ||
       (task.description || "").toLowerCase().includes(searchText) ||
       (task.project?.name || "").toLowerCase().includes(searchText) ||
       (task.assignee?.name || "").toLowerCase().includes(searchText);
@@ -254,6 +256,33 @@ function Tasks() {
 
     return matchesSearch && matchesStatus && matchesPriority;
   });
+
+  // Calculate the number of pages and tasks for the current page.
+  const totalPages = Math.ceil(filteredTasks.length / tasksPerPage);
+
+  const startIndex = (currentPage - 1) * tasksPerPage;
+
+  const paginatedTasks = filteredTasks.slice(
+    startIndex,
+    startIndex + tasksPerPage,
+  );
+
+  // Reset pagination when the search or filters change.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, priorityFilter]);
+
+  // Keep the current page valid after deleting or filtering tasks.
+  useEffect(() => {
+    if (totalPages === 0) {
+      if (currentPage !== 1) setCurrentPage(1);
+      return;
+    }
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   function statusStyle(status) {
     if (status === "Completed") {
@@ -446,7 +475,7 @@ function Tasks() {
               </thead>
 
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {filteredTasks.map((task) => {
+                {paginatedTasks.map((task) => {
                   const canManageTask = isProjectOwner(task.project);
                   const canEdit = canEditTask(task);
 
@@ -545,6 +574,55 @@ function Tasks() {
           </div>
         )}
       </div>
+
+      {/* Pagination controls */}
+      {!loading && totalPages > 1 && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Showing {startIndex + 1}–
+            {Math.min(startIndex + tasksPerPage, filteredTasks.length)} of{" "}
+            {filteredTasks.length} tasks
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => page - 1)}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-900"
+            >
+              Previous
+            </button>
+
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+              (page) => (
+                <button
+                  key={page}
+                  type="button"
+                  onClick={() => setCurrentPage(page)}
+                  aria-current={currentPage === page ? "page" : undefined}
+                  className={`h-9 min-w-9 rounded-lg px-3 text-sm font-medium transition ${
+                    currentPage === page
+                      ? "bg-emerald-600 text-white"
+                      : "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-900"
+                  }`}
+                >
+                  {page}
+                </button>
+              ),
+            )}
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => page + 1)}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-900"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div

@@ -1,9 +1,7 @@
 const multer = require("multer");
 
-// Store uploaded images in memory before sending them to Cloudinary.
 const storage = multer.memoryStorage();
 
-// Allow only supported image formats.
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 

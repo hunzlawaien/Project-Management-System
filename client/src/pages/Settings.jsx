@@ -287,7 +287,7 @@ function Settings({ darkMode, setDarkMode }) {
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "security", label: "Security", icon: Lock },
     { id: "workspace", label: "Workspace", icon: Building2 },
-    { id: "danger", label: "Danger Zone", icon: AlertTriangle },
+    { id: "danger", label: "Delete Account", icon: AlertTriangle },
   ];
 
   const profileImage = preview || user.profilePicture;

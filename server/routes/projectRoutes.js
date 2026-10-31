@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
     const projects = await Project.find({
       members: req.user.userId,
     })
-      .populate("members", "name email")
+      .populate("members", "name email profilePicture")
       .sort({ createdAt: -1 });
 
     res.json(projects);
@@ -74,7 +74,7 @@ router.post("/", async (req, res) => {
       members: [req.user.userId],
     });
 
-    await project.populate("members", "name email");
+    await project.populate("members", "name email profilePicture");
 
     res.status(201).json(project);
   } catch (error) {
@@ -142,7 +142,7 @@ router.post("/:id/members", async (req, res) => {
     project.members.push(user._id);
 
     await project.save();
-    await project.populate("members", "name email");
+    await project.populate("members", "name email profilePicture");
 
     res.status(200).json({
       message: "Collaborator added successfully",
@@ -199,7 +199,7 @@ router.delete("/:id/members/:memberId", async (req, res) => {
     );
 
     await project.save();
-    await project.populate("members", "name email");
+    await project.populate("members", "name email profilePicture");
 
     res.json({
       message: "Collaborator removed successfully",
@@ -222,7 +222,7 @@ router.get("/:id", async (req, res) => {
     const project = await Project.findOne({
       _id: req.params.id,
       members: req.user.userId,
-    }).populate("members", "name email");
+    }).populate("members", "name email profilePicture");
 
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
@@ -322,7 +322,7 @@ router.put("/:id", async (req, res) => {
     Object.assign(project, updates);
 
     await project.save();
-    await project.populate("members", "name email");
+    await project.populate("members", "name email profilePicture");
 
     res.json(project);
   } catch (error) {
