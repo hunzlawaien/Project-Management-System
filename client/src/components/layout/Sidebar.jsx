@@ -27,13 +27,15 @@ function getStoredUser() {
   }
 }
 
-function Sidebar() {
+function Sidebar({ onNavigate }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(getStoredUser);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const handleProfileUpdate = () => {
       setUser(getStoredUser());
+      setImageError(false);
     };
 
     window.addEventListener("profileUpdated", handleProfileUpdate);
@@ -55,13 +57,22 @@ function Sidebar() {
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-950">
       {/* Brand */}
-      <div className="px-6 pb-7 pt-8">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-          Co<span className="text-emerald-500">Work</span>
-        </h1>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          Project management workspace
-        </p>
+      <div className="flex items-center gap-3 px-6 pb-7 pt-8">
+        <img
+          src="/logo-cowork.png"
+          alt="CoWork logo"
+          className="h-11 w-11 shrink-0 rounded-lg object-cover"
+        />
+
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Co<span className="text-emerald-500">Work</span>
+          </h1>
+
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Project management workspace
+          </p>
+        </div>
       </div>
 
       {/* Navigation */}
@@ -74,6 +85,7 @@ function Sidebar() {
               key={item.label}
               to={item.path}
               end={item.path === "/"}
+              onClick={onNavigate}
               className={({ isActive }) =>
                 `flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
@@ -93,11 +105,12 @@ function Sidebar() {
       <div className="border-t border-gray-200 p-4 dark:border-gray-800">
         <div className="flex items-center gap-3 rounded-lg p-2">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-            {user.profilePicture ? (
+            {user.profilePicture && !imageError ? (
               <img
                 src={user.profilePicture}
-                alt="Profile"
+                alt={`${userName}'s profile`}
                 className="h-full w-full object-cover"
+                onError={() => setImageError(true)}
               />
             ) : (
               userInitial
@@ -108,6 +121,7 @@ function Sidebar() {
             <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
               {userName}
             </p>
+
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Signed in
             </p>

@@ -1,5 +1,5 @@
-import { Sun, Moon, Menu, LogOut } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Sun, Moon, Menu } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 const pageDetails = {
   "/": {
@@ -34,17 +34,10 @@ const pageDetails = {
 
 function Header({ darkMode, setDarkMode, onMenuClick }) {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const currentPage = pageDetails[location.pathname] || {
     title: "CoWork",
     description: "Manage your projects and tasks in one place.",
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/login", { replace: true });
   };
 
   return (
@@ -69,18 +62,6 @@ function Header({ darkMode, setDarkMode, onMenuClick }) {
           className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-
-        {/* Logout */}
-        <button
-          type="button"
-          onClick={handleLogout}
-          title="Log out"
-          aria-label="Log out"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
-        >
-          <LogOut size={17} />
-          <span className="hidden sm:inline">Logout</span>
         </button>
 
         {/* Mobile menu */}

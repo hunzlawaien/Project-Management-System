@@ -515,8 +515,18 @@ function Projects() {
                             className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 dark:bg-gray-900"
                           >
                             <div className="flex min-w-0 items-center gap-2">
-                              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                                {memberName.charAt(0).toUpperCase()}
+                              {/* Collaborator profile picture */}
+                              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-emerald-100 text-xs font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                {typeof member !== "string" &&
+                                member?.profilePicture ? (
+                                  <img
+                                    src={member.profilePicture}
+                                    alt={`${memberName}'s profile`}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  memberName.charAt(0).toUpperCase()
+                                )}
                               </div>
 
                               <div className="min-w-0">

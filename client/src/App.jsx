@@ -64,7 +64,7 @@ function AppContent() {
                         </button>
                       </div>
 
-                      <Sidebar />
+                      <Sidebar onNavigate={() => setMenuOpen(false)} />
                     </div>
                   </div>
                 )}
