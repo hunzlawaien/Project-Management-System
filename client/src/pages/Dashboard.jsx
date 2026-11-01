@@ -8,10 +8,11 @@ import {
   Users,
   Mail,
   CalendarDays,
+  Plus,
+  ArrowUpRight,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import StatCard from "../components/dashboard/StatCard";
 import { getProjects } from "../api/projects";
 import { getTasks } from "../api/tasks";
 import { getTeamMembers } from "../api/team";
@@ -74,9 +75,6 @@ function Dashboard() {
     refreshDashboard();
   }, []);
 
-  const totalProjects = projects.length;
-  const totalTasks = tasks.length;
-
   const completedTasks = tasks.filter(
     (task) => task.status === "Completed",
   ).length;
@@ -88,33 +86,48 @@ function Dashboard() {
   const stats = [
     {
       title: "Total Projects",
-      value: totalProjects,
+      value: projects.length,
       description: "Projects you can access",
       icon: FolderKanban,
+      iconStyle:
+        "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+      loading: loading,
     },
     {
       title: "Total Tasks",
-      value: totalTasks,
-      description: "Tasks across your projects",
+      value: tasks.length,
+      description: "Across your projects",
       icon: ListTodo,
+      iconStyle:
+        "bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
+      loading: loading,
     },
     {
       title: "Completed Tasks",
       value: completedTasks,
-      description: "Tasks finished",
+      description: "Successfully finished",
       icon: CircleCheck,
+      iconStyle:
+        "bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-400",
+      loading: loading,
     },
     {
-      title: "In Progress Tasks",
+      title: "In Progress",
       value: inProgressTasks,
-      description: "Tasks being worked on",
+      description: "Currently being worked on",
       icon: Clock3,
+      iconStyle:
+        "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
+      loading: loading,
     },
     {
       title: "Team Members",
       value: teamMembers.length,
-      description: "Unique project collaborators",
+      description: "Project collaborators",
       icon: Users,
+      iconStyle:
+        "bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-400",
+      loading: teamLoading,
     },
   ];
 
@@ -215,14 +228,14 @@ function Dashboard() {
 
   function getStatusStyle(status) {
     if (status === "Completed") {
-      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/10 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20";
     }
 
     if (status === "In Progress") {
-      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+      return "bg-blue-50 text-blue-700 ring-1 ring-blue-600/10 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-400/20";
     }
 
-    return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
+    return "bg-gray-100 text-gray-700 ring-1 ring-gray-500/10 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700";
   }
 
   function getInitials(name) {
@@ -237,18 +250,117 @@ function Dashboard() {
 
   function getPriorityStyle(priority) {
     if (priority === "High") {
-      return "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300";
+      return "bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400";
     }
 
     if (priority === "Medium") {
-      return "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300";
+      return "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400";
     }
 
     return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300";
   }
 
+  function SectionHeader({ title, description, to, linkLabel = "View all" }) {
+    return (
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight text-gray-900 dark:text-white">
+            {title}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            {description}
+          </p>
+        </div>
+
+        <Link
+          to={to}
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1.5 text-sm font-medium text-emerald-700 transition hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10"
+        >
+          {linkLabel}
+          <ArrowUpRight size={15} />
+        </Link>
+      </div>
+    );
+  }
+
+  function EmptyState({ icon: Icon, title, description, to, action }) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-center">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+          <Icon size={22} />
+        </div>
+        <p className="text-sm font-semibold text-gray-900 dark:text-white">
+          {title}
+        </p>
+        <p className="mt-1 max-w-xs text-sm text-gray-500 dark:text-gray-400">
+          {description}
+        </p>
+        {to && (
+          <Link
+            to={to}
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
+          >
+            <Plus size={16} />
+            {action}
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const firstName = user.name?.trim().split(" ")[0] || "there";
+
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-full space-y-7 bg-gray-50/70 p-4 dark:bg-gray-950 sm:p-6 lg:p-8">
+      {/* Welcome header */}
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-950 dark:text-white sm:text-3xl">
+            Welcome back, {firstName}
+          </h1>
+
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            Here's what's happening with your projects today.
+          </p>
+
+          <p className="mt-2 text-xs font-medium text-gray-400 dark:text-gray-500">
+            {today}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={refreshDashboard}
+            disabled={loading || teamLoading}
+            aria-label="Refresh dashboard"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 text-sm font-medium text-gray-600 shadow-sm transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"
+          >
+            <RefreshCw
+              size={16}
+              className={loading || teamLoading ? "animate-spin" : ""}
+            />
+            Refresh
+          </button>
+
+          <Link
+            to="/projects"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
+          >
+            <Plus size={17} />
+            New Project
+          </Link>
+        </div>
+      </section>
+
+      {/* Main dashboard error */}
       {error && (
         <div
           role="alert"
@@ -259,203 +371,260 @@ function Dashboard() {
           <button
             type="button"
             onClick={loadDashboardData}
-            className="inline-flex items-center gap-2 text-sm font-medium text-red-700 hover:underline dark:text-red-300"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-red-700 hover:underline dark:text-red-300"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={15} />
             Try again
           </button>
         </div>
       )}
 
-      {/* Dashboard statistics */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {stats.map((stat) => (
-          <StatCard
-            key={stat.title}
-            {...stat}
-            value={
-              stat.title === "Team Members"
-                ? teamLoading
-                  ? "—"
-                  : stat.value
-                : loading
-                  ? "—"
-                  : stat.value
-            }
-          />
-        ))}
+      {/* Statistics */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {stats.map((stat) => {
+          const Icon = stat.icon;
+
+          return (
+            <div
+              key={stat.title}
+              className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-200/40 transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-gray-200/50 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none dark:hover:border-gray-700"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                  {stat.title}
+                </p>
+
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${stat.iconStyle}`}
+                >
+                  <Icon size={19} />
+                </div>
+              </div>
+
+              <p className="mt-4 text-3xl font-bold tracking-tight text-gray-950 dark:text-white">
+                {stat.loading ? (
+                  <span className="text-gray-300 dark:text-gray-700">—</span>
+                ) : (
+                  stat.value
+                )}
+              </p>
+
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                {stat.description}
+              </p>
+            </div>
+          );
+        })}
       </section>
 
-      {/* Recent projects */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">
-              Recent Projects
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Your latest project updates by creation date.
-            </p>
-          </div>
-
-          <Link
+      {/* Projects and my tasks */}
+      <section className="grid grid-cols-1 items-start gap-5 xl:grid-cols-5">
+        {/* Recent projects */}
+        <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-200/40 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-6 xl:col-span-3">
+          <SectionHeader
+            title="Recent Projects"
+            description="Your latest projects and their progress."
             to="/projects"
-            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
-          >
-            View all <span aria-hidden="true">→</span>
-          </Link>
-        </div>
+          />
 
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
-            <RefreshCw size={18} className="animate-spin" />
-            Loading dashboard...
-          </div>
-        ) : error ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Project information is unavailable.
-          </p>
-        ) : recentProjects.length === 0 ? (
-          <div className="py-10 text-center">
-            <FolderKanban size={36} className="mx-auto mb-3 text-gray-400" />
-            <p className="font-medium text-gray-900 dark:text-white">
-              No projects yet
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-gray-500 dark:text-gray-400">
+              <RefreshCw size={17} className="animate-spin" />
+              Loading projects...
+            </div>
+          ) : error ? (
+            <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              Project information is unavailable.
             </p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Create your first project to see your progress here.
-            </p>
-            <Link
+          ) : recentProjects.length === 0 ? (
+            <EmptyState
+              icon={FolderKanban}
+              title="No projects yet"
+              description="Create your first project to start organizing your work."
               to="/projects"
-              className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              Go to Projects
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {recentProjects.map((project) => {
-              const progress = Math.min(
-                100,
-                Math.max(0, Number(project.progress) || 0),
-              );
+              action="Create project"
+            />
+          ) : (
+            <div className="space-y-5">
+              {recentProjects.map((project) => {
+                const progress = Math.min(
+                  100,
+                  Math.max(0, Number(project.progress) || 0),
+                );
 
-              return (
-                <div key={project._id}>
-                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {project.name}
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Deadline: {formatDeadline(project.deadline)}
-                      </p>
-                    </div>
+                return (
+                  <div
+                    key={project._id}
+                    className="rounded-xl border border-gray-100 p-4 transition hover:border-emerald-200 dark:border-gray-800 dark:hover:border-emerald-900"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                          {project.name}
+                        </p>
 
-                    <div className="flex items-center gap-3">
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Deadline: {formatDeadline(project.deadline)}
+                        </p>
+                      </div>
+
                       <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(project.status)}`}
+                        className={`w-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(project.status)}`}
                       >
                         {project.status}
                       </span>
-                      <span className="w-10 text-right text-xs text-gray-500 dark:text-gray-400">
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between text-xs">
+                      <span className="font-medium text-gray-500 dark:text-gray-400">
+                        Project progress
+                      </span>
+                      <span className="font-semibold text-gray-800 dark:text-gray-200">
                         {progress}%
                       </span>
                     </div>
-                  </div>
 
-                  <div
-                    className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
-                    role="progressbar"
-                    aria-label={`${project.name} progress`}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-valuenow={progress}
-                  >
                     <div
-                      className="h-full rounded-full bg-emerald-600 transition-all"
-                      style={{ width: `${progress}%` }}
-                    />
+                      className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
+                      role="progressbar"
+                      aria-label={`${project.name} progress`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={progress}
+                    >
+                      <div
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* My tasks */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">
-              My Tasks
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Your assigned tasks and upcoming deadlines.
-            </p>
-          </div>
-
-          <Link
-            to="/my-tasks"
-            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
-          >
-            View all <span aria-hidden="true">→</span>
-          </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Loading your tasks...
-          </div>
-        ) : error ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Your tasks are unavailable.
-          </p>
-        ) : upcomingMyTasks.length === 0 ? (
-          <div className="py-8 text-center">
-            <ListTodo size={32} className="mx-auto mb-3 text-gray-400" />
-            <p className="font-medium text-gray-900 dark:text-white">
-              No pending tasks assigned to you
-            </p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Tasks assigned to your account will appear here.
-            </p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {upcomingMyTasks.map((task) => {
-              const overdue = isTaskOverdue(task.dueDate);
+        {/* My tasks */}
+        <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-200/40 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-6 xl:col-span-2">
+          <SectionHeader
+            title="My Tasks"
+            description="Your upcoming assigned work."
+            to="/my-tasks"
+          />
 
-              return (
-                <div
-                  key={task._id}
-                  className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
+          {loading ? (
+            <div className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+              Loading your tasks...
+            </div>
+          ) : error ? (
+            <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              Your tasks are unavailable.
+            </p>
+          ) : upcomingMyTasks.length === 0 ? (
+            <EmptyState
+              icon={ListTodo}
+              title="You're all caught up"
+              description="Tasks assigned to your account will appear here."
+              to="/tasks"
+              action="View tasks"
+            />
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {upcomingMyTasks.map((task) => {
+                const overdue = isTaskOverdue(task.dueDate);
+
+                return (
+                  <div key={task._id} className="py-4 first:pt-1 last:pb-1">
+                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
                       {task.title}
                     </p>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Project: {task.project?.name || "Unknown project"}
+
+                    <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                      {task.project?.name || "Unknown project"}
                     </p>
-                    <p
-                      className={`mt-2 flex items-center gap-1 text-xs ${
-                        overdue
-                          ? "font-medium text-red-600 dark:text-red-400"
-                          : "text-gray-500 dark:text-gray-400"
-                      }`}
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 text-xs ${
+                          overdue
+                            ? "font-medium text-red-600 dark:text-red-400"
+                            : "text-gray-500 dark:text-gray-400"
+                        }`}
+                      >
+                        <CalendarDays size={13} />
+                        {getTaskDeadlineLabel(task.dueDate)}
+                      </span>
+
+                      <span
+                        className={`rounded-full px-2 py-1 text-[11px] font-medium ${getStatusStyle(task.status)}`}
+                      >
+                        {task.status}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`mt-2 inline-flex rounded-full px-2 py-1 text-[11px] font-medium ${getPriorityStyle(task.priority)}`}
                     >
-                      <CalendarDays size={14} />
-                      {getTaskDeadlineLabel(task.dueDate)}
+                      {task.priority} priority
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Recent tasks and collaborators */}
+      <section className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
+        {/* Recent tasks */}
+        <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-200/40 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-6">
+          <SectionHeader
+            title="Recent Tasks"
+            description="The latest tasks across your projects."
+            to="/tasks"
+          />
+
+          {loading ? (
+            <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              Loading tasks...
+            </div>
+          ) : error ? (
+            <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              Task information is unavailable.
+            </p>
+          ) : recentTasks.length === 0 ? (
+            <EmptyState
+              icon={ListTodo}
+              title="No tasks yet"
+              description="Create a task to see it in your recent activity."
+              to="/tasks"
+              action="View tasks"
+            />
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {recentTasks.map((task) => (
+                <div
+                  key={task._id}
+                  className="flex flex-col gap-3 py-4 first:pt-1 last:pb-1 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                      {task.title}
+                    </p>
+
+                    <p className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400">
+                      Project: {task.project?.name || "Unassigned"}
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(task.status)}`}
                     >
                       {task.status}
                     </span>
+
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-medium ${getPriorityStyle(task.priority)}`}
                     >
@@ -463,187 +632,106 @@ function Dashboard() {
                     </span>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Recent tasks */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">
-              Recent Tasks
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              The latest tasks across your projects.
-            </p>
-          </div>
-
-          <Link
-            to="/tasks"
-            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
-          >
-            View all <span aria-hidden="true">→</span>
-          </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Loading tasks...
-          </div>
-        ) : error ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            Task information is unavailable.
-          </p>
-        ) : recentTasks.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-            No tasks yet. Create a task to see it here.
-          </p>
-        ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {recentTasks.map((task) => (
-              <div
-                key={task._id}
-                className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {task.title}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Project: {task.project?.name || "Unassigned"}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusStyle(task.status)}`}
-                  >
-                    {task.status}
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium ${getPriorityStyle(task.priority)}`}
-                  >
-                    {task.priority} priority
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Recent team members */}
-      <section className="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-950 sm:p-6">
-        <div className="mb-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-gray-900 dark:text-white">
-              Project Collaborators
-            </h2>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              People collaborating across your projects.
-            </p>
-          </div>
-
-          <Link
+        {/* Project collaborators */}
+        <div className="rounded-2xl border border-gray-200/80 bg-white p-5 shadow-sm shadow-gray-200/40 dark:border-gray-800 dark:bg-gray-900 dark:shadow-none sm:p-6">
+          <SectionHeader
+            title="Project Collaborators"
+            description="People working across your projects."
             to="/team"
-            className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
-          >
-            View all <span aria-hidden="true">→</span>
-          </Link>
-        </div>
+          />
 
-        {teamLoading ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500 dark:text-gray-400">
-            <RefreshCw size={18} className="animate-spin" />
-            Loading collaborators...
-          </div>
-        ) : teamError ? (
-          <div className="py-8 text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {teamError}
-            </p>
-            <button
-              type="button"
-              onClick={loadTeamData}
-              className="mt-3 text-sm font-medium text-emerald-700 hover:underline dark:text-emerald-400"
-            >
-              Try again
-            </button>
-          </div>
-        ) : recentTeamMembers.length === 0 ? (
-          <div className="py-8 text-center">
-            <Users size={32} className="mx-auto mb-3 text-gray-400" />
-            <p className="font-medium text-gray-900 dark:text-white">
-              No collaborators yet
-            </p>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Add members to your projects to see them here.
-            </p>
-            <Link
+          {teamLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500 dark:text-gray-400">
+              <RefreshCw size={17} className="animate-spin" />
+              Loading collaborators...
+            </div>
+          ) : teamError ? (
+            <div className="py-8 text-center">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {teamError}
+              </p>
+
+              <button
+                type="button"
+                onClick={loadTeamData}
+                className="mt-3 text-sm font-semibold text-emerald-700 hover:underline dark:text-emerald-400"
+              >
+                Try again
+              </button>
+            </div>
+          ) : recentTeamMembers.length === 0 ? (
+            <EmptyState
+              icon={Users}
+              title="No collaborators yet"
+              description="Add members to your projects to see them here."
               to="/team"
-              className="mt-4 inline-flex items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
-            >
-              View Team
-            </Link>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800">
-            {recentTeamMembers.map((member) => (
-              <div key={member._id} className="flex items-center gap-3 py-4">
-                {/* Profile picture with initials fallback */}
-                <div className="relative h-10 w-10 shrink-0">
-                  {member.profilePicture && (
-                    <img
-                      src={member.profilePicture}
-                      alt={member.name || "Profile"}
-                      className="h-10 w-10 rounded-full object-cover"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                        event.currentTarget.nextElementSibling.style.display =
-                          "flex";
-                      }}
-                    />
-                  )}
-
-                  <div
-                    className={`absolute inset-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 ${
-                      member.profilePicture ? "hidden" : "flex"
-                    }`}
-                  >
-                    {getInitials(member.name)}
-                  </div>
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900 dark:text-white">
-                    {member.name}
-                  </p>
-                  <p className="mt-1 truncate text-sm text-gray-500 dark:text-gray-400">
-                    {member.email}
-                  </p>
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {member.projects?.length || 0}{" "}
-                    {(member.projects?.length || 0) === 1
-                      ? "project"
-                      : "projects"}
-                  </p>
-                </div>
-
-                <a
-                  href={`mailto:${member.email}`}
-                  title={member.email}
-                  aria-label={`Email ${member.name}`}
-                  className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-emerald-700 dark:hover:bg-gray-800 dark:hover:text-emerald-400"
+              action="View team"
+            />
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {recentTeamMembers.map((member) => (
+                <div
+                  key={member._id}
+                  className="flex items-center gap-3 py-4 first:pt-1 last:pb-1"
                 >
-                  <Mail size={18} />
-                </a>
-              </div>
-            ))}
-          </div>
-        )}
+                  <div className="relative h-11 w-11 shrink-0">
+                    {member.profilePicture && (
+                      <img
+                        src={member.profilePicture}
+                        alt={member.name || "Profile"}
+                        className="h-11 w-11 rounded-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                          event.currentTarget.nextElementSibling.style.display =
+                            "flex";
+                        }}
+                      />
+                    )}
+
+                    <div
+                      className={`absolute inset-0 items-center justify-center rounded-full bg-emerald-100 text-sm font-semibold text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 ${
+                        member.profilePicture ? "hidden" : "flex"
+                      }`}
+                    >
+                      {getInitials(member.name)}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                      {member.name}
+                    </p>
+
+                    <p className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">
+                      {member.email}
+                    </p>
+
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      {member.projects?.length || 0}{" "}
+                      {(member.projects?.length || 0) === 1
+                        ? "project"
+                        : "projects"}
+                    </p>
+                  </div>
+
+                  <a
+                    href={`mailto:${member.email}`}
+                    title={`Email ${member.name}`}
+                    aria-label={`Email ${member.name}`}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-gray-400 transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+                  >
+                    <Mail size={17} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );
