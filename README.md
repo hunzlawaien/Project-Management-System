@@ -1,6 +1,6 @@
-# TaskFlow – Project Management System
+# CoWork – Project Management System
 
-TaskFlow is a full-stack project management application designed to help users organize projects, manage tasks, collaborate with team members, and track project progress through a centralized dashboard.
+CoWork is a full-stack project management application designed to help users organize projects, manage tasks, collaborate with team members, and track project progress through a centralized dashboard.
 
 The application provides a clean, responsive interface with light and dark themes, user authentication, and project-wise team management.
 
@@ -198,7 +198,7 @@ http://localhost:5173
 
 ## Deployment
 
-TaskFlow is configured for deployment through Vercel Services.
+CoWork is configured for deployment through Vercel Services.
 
 The frontend and backend are maintained in the same repository and deployed through a single Vercel project.
 
@@ -234,5 +234,3 @@ Configure the required backend environment variables in Vercel before deploying.
 - LinkedIn: [Hunzla Waien](https://www.linkedin.com/in/hunzla-waien/)
 
 ---
-
-_TaskFlow – Plan, Organize, and Get Things Done._
