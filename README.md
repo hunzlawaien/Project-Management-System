@@ -6,6 +6,9 @@ The application provides a clean, responsive interface with light and dark theme
 
 Live Website: https://project-management-system-orcin-sigma.vercel.app/
 
+Email: ali.raza@cowork.com
+Password: abcd1234
+
 ## Features
 
 ### Dashboard
